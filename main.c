@@ -384,11 +384,14 @@ static void server_new_keyboard(struct WaylandServer *server, struct wlr_input_d
 	keyboard->server = server;
 	keyboard->wlr_keyboard = wlr_keyboard;
 
-	/* We need to prepare an XKB keymap and assign it to the keyboard. This
-	 * assumes the defaults (e.g. layout = "us"). */
+
+	struct xkb_rule_names layout_de = {
+		"", "", "de", "", ""
+	};
+
+	//disgusting: hardcoded de layout
 	struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-	struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, NULL,
-		XKB_KEYMAP_COMPILE_NO_FLAGS);
+	struct xkb_keymap *keymap = xkb_keymap_new_from_names(context, &layout_de, XKB_KEYMAP_COMPILE_NO_FLAGS);
 
 	wlr_keyboard_set_keymap(wlr_keyboard, keymap);
 	xkb_keymap_unref(keymap);
@@ -471,12 +474,12 @@ struct tinywl_toplevel {
 const float bordercolor[] = COLOR(0xFF0000FF);
 
 
-void new_xdg_decoration_notify (struct wl_listener *listener, void *data) {
+void xdg_new_decoration_notify (struct wl_listener *listener, void *data) {
 	struct wlr_xdg_toplevel_decoration_v1 *dec = data;
 	wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 }
 
-struct wl_listener xdg_decoration = {.notify = new_xdg_decoration_notify};
+struct wl_listener xdg_decoration = {.notify = xdg_new_decoration_notify};
 
 
 struct WaylandClient {

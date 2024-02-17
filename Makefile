@@ -12,7 +12,7 @@ xdg-shell-protocol.h:
 	$(WAYLAND_SCANNER) server-header \
 		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
 
-VitoWM: main.c xdg-shell-protocol.h
+VitoWM: wayland.c xdg-shell-protocol.h
 	$(CC) $(CFLAGS) \
 		-g -Wall -I. \
 		-DWLR_USE_UNSTABLE \
