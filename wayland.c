@@ -25,6 +25,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_server_decoration.h>
+#include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -69,6 +70,8 @@ static struct WaylandServer {
 	struct wl_listener new_xdg_surface;
 	struct wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
     struct wl_listener xdg_decoration_listener;
+
+	struct wlr_layer_shell_v1* layer_shell;
 } server;
 
 struct WaylandClient {
@@ -83,7 +86,7 @@ struct WaylandClient {
 	struct wl_listener unmap;
 	struct wl_listener destroy;
 
-	struct LayoutClient layoutClient;
+	struct LayoutNode layoutClient;
 };
 
 struct WaylandKeyboard {
@@ -98,7 +101,7 @@ struct WaylandKeyboard {
 
     //CLIENTS AND SURFACES
 
-static void client_set_focused(struct LayoutClient* client) {
+void client_set_focused(struct LayoutNode* client) {
 	if(!client) return;
 	struct WaylandClient* wlClient = wl_container_of(client, wlClient, layoutClient);
 
@@ -119,37 +122,52 @@ static void client_set_focused(struct LayoutClient* client) {
 			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
 }
 
-static void client_set_extends(struct LayoutClient* client, struct wlr_box extends) {
+void client_set_extends(struct LayoutNode* client, const struct wlr_box extends) {
 	if(!client) return;
 	struct WaylandClient* wlClient = wl_container_of(client, wlClient, layoutClient);
 
+	wlr_scene_node_set_position(&wlClient->root_node->node, extends.x, extends.y);
+
+	wlr_xdg_toplevel_set_size(wlClient->xdg_toplevel, extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
+	wlr_scene_node_set_position(&wlClient->surface_node->node, BORDERWIDTH, BORDERWIDTH);
 	
+	if(!wlClient->border[0]) {
+		wlClient->border[0] = wlr_scene_rect_create(wlClient->root_node, extends.width, BORDERWIDTH, bordercolor);
+		wlClient->border[1] = wlr_scene_rect_create(wlClient->root_node, extends.width, BORDERWIDTH, bordercolor);
+		wlClient->border[2] = wlr_scene_rect_create(wlClient->root_node, BORDERWIDTH, extends.height-2*BORDERWIDTH, bordercolor);
+		wlClient->border[3] = wlr_scene_rect_create(wlClient->root_node, BORDERWIDTH, extends.height-2*BORDERWIDTH, bordercolor);
+	} else {
+		wlr_scene_rect_set_size(wlClient->border[0], extends.width, BORDERWIDTH);
+		wlr_scene_rect_set_size(wlClient->border[1], extends.width, BORDERWIDTH);
+		wlr_scene_rect_set_size(wlClient->border[2], BORDERWIDTH, extends.height-2*BORDERWIDTH);
+		wlr_scene_rect_set_size(wlClient->border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
+	}
+	wlr_scene_node_set_position(&wlClient->border[1]->node, 0, extends.height-BORDERWIDTH);
+	wlr_scene_node_set_position(&wlClient->border[2]->node, 0, BORDERWIDTH);
+	wlr_scene_node_set_position(&wlClient->border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
+
 }
 
 static void client_xdg_surface_map_notify(struct wl_listener* listener, void* data) {
 	struct WaylandClient* client = wl_container_of(listener, client, map);
 
-	wlr_scene_node_set_position(&client->root_node->node, 100, 100);
-
-	const int width = 1000, height = 800;
-
-	wlr_xdg_toplevel_set_size(client->xdg_toplevel, width-2*BORDERWIDTH, height-2*BORDERWIDTH);
-	wlr_scene_node_set_position(&client->surface_node->node, BORDERWIDTH, BORDERWIDTH);
-	
-	client->border[0] = wlr_scene_rect_create(client->root_node, width, BORDERWIDTH, bordercolor);
-	client->border[1] = wlr_scene_rect_create(client->root_node, width, BORDERWIDTH, bordercolor);
-	client->border[2] = wlr_scene_rect_create(client->root_node, BORDERWIDTH, height-2*BORDERWIDTH, bordercolor);
-	client->border[3] = wlr_scene_rect_create(client->root_node, BORDERWIDTH, height-2*BORDERWIDTH, bordercolor);
-	wlr_scene_node_set_position(&client->border[1]->node, 0, height-BORDERWIDTH);
-	wlr_scene_node_set_position(&client->border[2]->node, 0, BORDERWIDTH);
-	wlr_scene_node_set_position(&client->border[3]->node, width-BORDERWIDTH, BORDERWIDTH);
+	//struct wlr_box extends = {100, 100, 1000, 800};
+	//client_set_extends(&client->layoutClient, extends);
+	//client->xdg_toplevel->requested.
+	if(client->xdg_toplevel->parent == client->xdg_toplevel) wlr_log(WLR_INFO, "goo goo gaga");
+	if(client->xdg_toplevel->base->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL)
+		layout_add_client(&client->layoutClient);
 
 	client_set_focused(&client->layoutClient);
 }
 
 static void client_xdg_surface_unmap_notify(struct wl_listener* listener, void* data) {
 	struct WaylandClient* client = wl_container_of(listener, client, unmap);
-	for(unsigned i = 0; i < 4; i++) wlr_scene_node_destroy(&client->border[i]->node);
+	for(unsigned i = 0; i < 4; i++) {
+		wlr_scene_node_destroy(&client->border[i]->node);
+		client->border[i] = NULL;
+	}
+	layout_remove_client(&client->layoutClient);
 }
 
 static void client_xdg_surface_destroy_notify(struct wl_listener* listener, void* data) {
@@ -180,7 +198,7 @@ static void xdg_shell_new_surface_notify(struct wl_listener* listener, void* dat
 	//CREATE CLIENT FOR SURFACE
 	assert(xdg_surface->role == WLR_XDG_SURFACE_ROLE_TOPLEVEL);
 
-	struct WaylandClient* client = malloc(sizeof(*client));
+	struct WaylandClient* client = calloc(1, sizeof(*client));
 	client->xdg_toplevel = xdg_surface->toplevel;
 	client->root_node = wlr_scene_tree_create(&server.scene->tree);
 	client->surface_node = wlr_scene_xdg_surface_create(client->root_node, xdg_surface);
@@ -256,7 +274,7 @@ void backend_new_output_notify(struct wl_listener *listener, void *data) {
 	wlr_output_state_finish(&state);
 
 	//create struct
-	struct WaylandOutput *output = malloc(sizeof(*output));
+	struct WaylandOutput *output = calloc(1, sizeof(*output));
 	output->wlr_output = wlr_output;
 	wl_list_insert(&server.outputs, &output->link);
 
@@ -273,6 +291,14 @@ void backend_new_output_notify(struct wl_listener *listener, void *data) {
 	struct wlr_output_layout_output *l_output = wlr_output_layout_add_auto(server.output_layout, wlr_output);
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server.scene, wlr_output);
 	wlr_scene_output_layout_add_output(server.scene_layout, l_output, scene_output);
+
+	/*
+	struct wlr_box extends; //FIXME: DAS GAHT NÖD
+	extends.width = mode->width;
+	extends.height = mode->height;
+	extends.x = scene_output->x;
+	extends.y = scene_output->y;
+	layout_init(extends);*/
 }
 
 
@@ -423,7 +449,7 @@ static void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
 void add_new_keyboard_device(struct wlr_input_device* device) {
 	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
-	struct WaylandKeyboard *keyboard = malloc(sizeof(*keyboard));
+	struct WaylandKeyboard *keyboard = calloc(1, sizeof(*keyboard));
 	keyboard->wlr_keyboard = wlr_keyboard;
 
 	struct xkb_rule_names layout_de = {"", "", "de", "", ""};
@@ -509,6 +535,10 @@ bool waylandSetup() {
 	server.new_xdg_surface.notify = xdg_shell_new_surface_notify;
 	wl_signal_add(&server.xdg_shell->events.new_surface, &server.new_xdg_surface);
 
+	//TODO: LAYER SHELL IMPLEMENT das isch für so rofi und so
+	//server.layer_shell = wlr_layer_shell_v1_create(server.display, 4);
+	//server.layer_shell->events.
+
     //requesting serverside decorations of clients
 	wlr_server_decoration_manager_set_default_mode(
 			wlr_server_decoration_manager_create(server.display),
@@ -581,5 +611,7 @@ bool waylandSetup() {
 }
 
 int main() {
+	struct wlr_box box = {0, 0, 1000, 1000};
+	layout_init(box);
 	waylandSetup();
 }
