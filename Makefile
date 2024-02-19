@@ -21,10 +21,10 @@ wlr-layer-shell-unstable-v1-protocol.h:
 wayland.o: wayland.c layout.h xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h
 	$(CC) -c $< $(FLAGS)
 
-layout.o: layout.c layout.h wayland.h
+layout.o: layout.c layout.h wayland.h config.h
 	$(CC) -c $< $(FLAGS)
 
-VitoWM: wayland.o layout.o
+VitoWM: wayland.o layout.o config.h
 	$(CC) -o VitoWM $^ $(LIBS)
 
 clean:

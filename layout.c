@@ -136,13 +136,12 @@ static void node_init(Node* node) {
 
 
 
-static Node root;
+static Node root = {HORIZONTAL, NULL, NULL, NULL, NULL};
 static struct wlr_box extends;
 
 void layout_init(struct wlr_box output) {
-    root.nodeType = HORIZONTAL;
-    node_init(&root);
     extends = output;
+    layout_arrange(&root, extends);
 }
 
 void layout_add_client(struct LayoutNode* client) {

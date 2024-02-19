@@ -98,6 +98,16 @@ struct WaylandKeyboard {
 	struct wl_listener destroy;
 };
 
+struct WaylandOutput {
+	struct wl_list link;
+	struct wlr_output *wlr_output;
+	struct wl_listener frame;
+	struct wl_listener request_state;
+	struct wl_listener destroy;
+
+	struct wlr_box extends;
+};
+
 
     //CLIENTS AND SURFACES
 
@@ -222,14 +232,6 @@ void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
 
     // OUTPUTS (MONITORS)
 
-struct WaylandOutput {
-	struct wl_list link;
-	struct wlr_output *wlr_output;
-	struct wl_listener frame;
-	struct wl_listener request_state;
-	struct wl_listener destroy;
-};
-
 void output_frame_notify(struct wl_listener *listener, void *data) {
     //render frame
 	struct WaylandOutput *output = wl_container_of(listener, output, frame);
@@ -247,6 +249,10 @@ void output_request_state_notify(struct wl_listener *listener, void *data) {
     struct WaylandOutput *output = wl_container_of(listener, output, request_state);
 	const struct wlr_output_event_request_state *event = data;
 	wlr_output_commit_state(output->wlr_output, event->state);
+
+	output->extends.width = output->wlr_output->width;
+	output->extends.height = output->wlr_output->height;
+	layout_init(output->extends);
 }
 
 void output_destroy_notify(struct wl_listener *listener, void *data) {
@@ -292,13 +298,11 @@ void backend_new_output_notify(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server.scene, wlr_output);
 	wlr_scene_output_layout_add_output(server.scene_layout, l_output, scene_output);
 
-	/*
-	struct wlr_box extends; //FIXME: DAS GAHT NÖD
-	extends.width = mode->width;
-	extends.height = mode->height;
-	extends.x = scene_output->x;
-	extends.y = scene_output->y;
-	layout_init(extends);*/
+	output->extends.width = wlr_output->width;
+	output->extends.height = wlr_output->height;
+	output->extends.x = scene_output->x;
+	output->extends.y = scene_output->y;
+	layout_init(output->extends);
 }
 
 
