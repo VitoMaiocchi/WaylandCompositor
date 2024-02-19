@@ -1,6 +1,14 @@
 #ifndef VITOWM_CONFIG_H
 #define VITOWM_CONFIG_H
 
+#define BORDERWIDTH 2
 
+#define COLOR(hex)    { ((hex >> 24) & 0xFF) / 255.0f, \
+                        ((hex >> 16) & 0xFF) / 255.0f, \
+                        ((hex >> 8) & 0xFF) / 255.0f, \
+                        (hex & 0xFF) / 255.0f }
+
+const float bordercolor_inactive[] = COLOR(0x777777FF);
+const float bordercolor_active[] = COLOR(0xFF0000FF);
 
 #endif

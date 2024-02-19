@@ -94,19 +94,19 @@ static void node_add_child(Node* root, Node* child) {
 
 /*
 removes child node. all parameters must be != 0
-@return 0 if child was removed succesfully
+@return if a child was removed: pointer to remaining child (can be NULL) else NULL
 */
-static int node_remove_child(Node* root, Node* child) {
+static Node* node_remove_child(Node* root, Node* child) {
     assert(root);
     assert(child);
 
-    if(!root->child) return -1;
+    if(!root->child) return NULL;
     Node* c = root->child;
     Node* it = c;
     if(c == child) {
         if(child->next == child) {
             root->child = NULL;
-            return 0;
+            return NULL;
         }
         root->child = child->next;
         goto remove_child;
@@ -117,14 +117,14 @@ static int node_remove_child(Node* root, Node* child) {
         if(it == child) goto remove_child;
         it = it->next;
     }
-    return -1;
+    return NULL;
 
     remove_child:
 
     c->prev->next = c->next;
     c->next->prev = c->prev;
 
-    return 0;
+    return c->next;
 }
 
 static void node_init(Node* node) {
@@ -151,8 +151,9 @@ void layout_add_client(struct LayoutNode* client) {
     layout_arrange(&root, extends);
 }
 
-void layout_remove_client(struct LayoutNode* client) {
-    node_remove_child(&root, client);
+struct LayoutNode* layout_remove_client(struct LayoutNode* client) {
+    Node* next = node_remove_child(&root, client);
     node_init(client);
     layout_arrange(&root, extends);
+    return next;
 }

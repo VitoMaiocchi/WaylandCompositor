@@ -3,3 +3,4 @@ VitoWM
 *-protocol.h
 reference
 .vscode
+*.o

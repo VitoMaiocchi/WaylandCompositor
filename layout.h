@@ -18,6 +18,6 @@ struct LayoutNode {
 
 void layout_init(struct wlr_box output);
 void layout_add_client(struct LayoutNode* client);
-void layout_remove_client(struct LayoutNode* client);
+struct LayoutNode* layout_remove_client(struct LayoutNode* client);
 
 #endif

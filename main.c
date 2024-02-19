@@ -471,7 +471,7 @@ struct tinywl_toplevel {
                         ((hex >> 8) & 0xFF) / 255.0f, \
                         (hex & 0xFF) / 255.0f }
 
-const float bordercolor[] = COLOR(0xFF0000FF);
+const float bordercolor_inactive[] = COLOR(0xFF0000FF);
 
 
 void xdg_new_decoration_notify (struct wl_listener *listener, void *data) {
@@ -510,7 +510,7 @@ static void client_set_focused(struct WaylandClient* client) {
 
 	if (prev_surface) {
 		struct wlr_xdg_toplevel *prev_toplevel = wlr_xdg_toplevel_try_from_wlr_surface(prev_surface);
-		//ich glaub das isch mit server side decorations nöd nötig. (unde au nöd) TODO: bordercolor
+		//ich glaub das isch mit server side decorations nöd nötig. (unde au nöd) TODO: bordercolor_inactive
 		if (prev_toplevel != NULL) wlr_xdg_toplevel_set_activated(prev_toplevel, false);
 	}
 
@@ -531,10 +531,10 @@ static void client_xdg_surface_map_notify(struct wl_listener* listener, void* da
 	wlr_xdg_toplevel_set_size(client->xdg_toplevel, width-2*BORDERWIDTH, height-2*BORDERWIDTH);
 	wlr_scene_node_set_position(&client->surface_node->node, BORDERWIDTH, BORDERWIDTH);
 	
-	client->border[0] = wlr_scene_rect_create(client->root_node, width, BORDERWIDTH, bordercolor);
-	client->border[1] = wlr_scene_rect_create(client->root_node, width, BORDERWIDTH, bordercolor);
-	client->border[2] = wlr_scene_rect_create(client->root_node, BORDERWIDTH, height-2*BORDERWIDTH, bordercolor);
-	client->border[3] = wlr_scene_rect_create(client->root_node, BORDERWIDTH, height-2*BORDERWIDTH, bordercolor);
+	client->border[0] = wlr_scene_rect_create(client->root_node, width, BORDERWIDTH, bordercolor_inactive);
+	client->border[1] = wlr_scene_rect_create(client->root_node, width, BORDERWIDTH, bordercolor_inactive);
+	client->border[2] = wlr_scene_rect_create(client->root_node, BORDERWIDTH, height-2*BORDERWIDTH, bordercolor_inactive);
+	client->border[3] = wlr_scene_rect_create(client->root_node, BORDERWIDTH, height-2*BORDERWIDTH, bordercolor_inactive);
 	wlr_scene_node_set_position(&client->border[1]->node, 0, height-BORDERWIDTH);
 	wlr_scene_node_set_position(&client->border[2]->node, 0, BORDERWIDTH);
 	wlr_scene_node_set_position(&client->border[3]->node, width-BORDERWIDTH, BORDERWIDTH);
