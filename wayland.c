@@ -46,6 +46,7 @@ static struct WaylandServer {
 
 	struct wlr_cursor* cursor;
 	struct wlr_xcursor_manager* cursor_mgr;
+	struct WaylandClient* pointer_focus;
 	struct wl_listener cursor_motion;
 	struct wl_listener cursor_motion_absolute;
 	struct wl_listener cursor_button;
@@ -70,6 +71,7 @@ static struct WaylandServer {
 
 struct WaylandClient {
 	struct wlr_xdg_toplevel *xdg_toplevel;
+	struct wlr_xdg_surface* xdg_surface;
 
 	struct wlr_scene_tree* root_node; //Root node of the window. It is the parent of the surface and the borders
 	struct wlr_scene_tree* surface_node; //Surface node: holds the surface itself without decorations
@@ -242,6 +244,7 @@ static void xdg_shell_new_surface_notify(struct wl_listener* listener, void* dat
 	client->root_node = wlr_scene_tree_create(&server.scene->tree);
 	client->surface_node = wlr_scene_xdg_surface_create(client->root_node, xdg_surface);
 	xdg_surface->data = client->surface_node;
+	client->xdg_surface = xdg_surface;
 
 
 	//CONFIGURE LISTENERS
@@ -337,15 +340,50 @@ void backend_new_output_notify(struct wl_listener *listener, void *data) {
 
 // INPUT HANDLING
 
+void cursor_enter_client(struct WaylandClient* client) {
+	wlr_seat_pointer_notify_enter(server.seat, client->xdg_surface->surface, 
+		server.cursor->x - client->surface_node->node.x, server.cursor->y - client->surface_node->node.y);
+	client_set_focused(&client->layoutNode);
+}
+
+void cursor_exit_client(struct WaylandClient* client) {
+	wlr_seat_pointer_clear_focus(server.seat);
+}
+
+void cursor_process_movement(uint32_t time) {
+	struct LayoutNode* clientNode = layout_get_client_at_position(server.cursor->x, server.cursor->y);
+
+	if(!clientNode) {
+		if(server.pointer_focus) {
+			cursor_exit_client(server.pointer_focus);
+			server.pointer_focus = NULL;
+		}
+		return;
+	}
+
+	struct WaylandClient* client = wl_container_of(clientNode, client, layoutNode);
+
+	if(server.pointer_focus != client) {
+		if(server.pointer_focus) cursor_exit_client(server.pointer_focus);
+		server.pointer_focus = client;
+		cursor_enter_client(server.pointer_focus);
+	}
+
+	wlr_seat_pointer_notify_motion(server.seat, time, 
+			server.cursor->x - client->surface_node->node.x, server.cursor->y - client->surface_node->node.y);
+}
+
 void cursor_motion_notify(struct wl_listener *listener, void *data) {
     struct wlr_pointer_motion_event *event = data;
     wlr_cursor_move(server.cursor, &event->pointer->base, event->delta_x, event->delta_y);
-	wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
+	cursor_process_movement(event->time_msec);
+	wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default"); //TODO: di göhret nöd da ane
 }
 
 void cursor_motion_absolute_notify(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_motion_absolute_event *event = data;
 	wlr_cursor_warp_absolute(server.cursor, &event->pointer->base, event->x, event->y);
+	cursor_process_movement(event->time_msec);
 	wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
 }
 
@@ -407,10 +445,10 @@ static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) 
 static bool handle_keybinding(xkb_keysym_t sym, uint32_t modmask) {
 
 	//printf("KEY PRESSED: %i", sym);
-	wlr_log(WLR_INFO, "KEY PRESSED = %i", sym);
+	wlr_log(WLR_DEBUG, "KEY PRESSED = %i", sym);
 	if(!(modmask & WLR_MODIFIER_LOGO)) return false;
 
-	wlr_log(WLR_INFO, "WITH WIN KEY PRESSED = %i", sym);
+	wlr_log(WLR_DEBUG, "WITH WIN KEY PRESSED = %i", sym);
 
 	if((modmask & WLR_MODIFIER_SHIFT) && sym == XKB_KEY_Q) {
 		wl_display_terminate(server.display);

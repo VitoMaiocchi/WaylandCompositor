@@ -8,9 +8,10 @@ typedef struct LayoutNode Node;
 
 static void layout_arrange(Node* root, struct wlr_box extends) {
     if(!root) return;
+    root->extends = extends;
 
     if(root->nodeType == CLIENT) {
-        client_set_extends(root, extends);
+        client_set_extends(root, extends); //TODO: REMOVE DUPLICATE EXTENDS SYSTEM
         return;
     }
 
@@ -127,6 +128,25 @@ static Node* node_remove_child(Node* root, Node* child) {
     return c->next;
 }
 
+static Node* node_find(Node* root, const int x, const int y) {
+    assert(root);
+    if(!wlr_box_contains_point(&root->extends, x, y)) return NULL;
+
+    if(root->nodeType == CLIENT) return root;
+
+    if(!root->child) return NULL;
+    Node* c = root->child;
+    Node* it = c;
+    do {
+        assert(it);
+        Node* n = node_find(it, x, y);
+        if(n) return n;
+        it = it->next;
+    } while (it != c);
+
+    return NULL;
+}
+
 static void node_init(Node* node) {
     node->child = NULL;
     node->next = NULL;
@@ -156,4 +176,11 @@ struct LayoutNode* layout_remove_client(struct LayoutNode* client) {
     node_init(client);
     layout_arrange(&root, extends);
     return next;
+}
+
+struct LayoutNode* layout_get_client_at_position(const int x, const int y) {
+    Node* n = node_find(&root, x, y);
+    //if(!n) wlr_log(WLR_INFO, "FOUND NO NODE AT %i, %i", x, y);
+    //else   wlr_log(WLR_INFO, "FOUND NODE AT %i, %i : %p", x, y, n);
+    return n;
 }
