@@ -65,6 +65,8 @@ static struct WaylandServer {
     struct wl_listener xdg_decoration_listener;
 
 	struct wlr_layer_shell_v1* layer_shell;
+	struct wl_listener new_layer_shell_surface;
+	struct wl_listener delete_layer_shell_surface;
 
 	struct WaylandClient* focusedClient;
 } server;
@@ -565,7 +567,55 @@ void backend_new_input_notify(struct wl_listener *listener, void *data) {
 	wlr_seat_set_capabilities(server.seat, caps);
 }
 
+/*
+        struct WaylandClient* client = calloc(1, sizeof(*client));
+        client->xdg_toplevel = xdg_surface->toplevel;
+        client->root_node = wlr_scene_tree_create(&server.scene->tree);
+        client->surface_node = wlr_scene_xdg_surface_create(client->root_node, xdg_surface);
+        xdg_surface->data = client->surface_node;
+        client->xdg_surface = xdg_surface;
 
+        wlr_scene_node_set_position(&client->root_node->node, extends.x, extends.y);
+        wlr_xdg_toplevel_set_size(client->xdg_toplevel, extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
+        wlr_scene_node_set_position(&client->surface_node->node, BORDERWIDTH, BORDERWIDTH);
+*/
+
+struct LayerShellSurface {
+	struct wl_list link;
+	struct wlr_layer_surface_v1* ls_surface; 
+	struct wlr_scene_layer_surface_v1* surface_node;
+};
+
+struct wl_list lss_list;
+
+
+//LAYER SHELL ULTRA BASIC
+void layer_shell_new_surface(struct wl_listener *listener, void *data) {
+	struct wlr_layer_surface_v1* surface = data;
+	if(!surface) return;
+
+	struct LayerShellSurface* lss = calloc(1, sizeof(struct LayerShellSurface));
+	wl_list_insert(&lss_list, &lss->link);
+	lss->ls_surface = surface;
+
+	struct wlr_output* output = surface->output;
+	if(!output) {
+		if (wl_list_empty(&server.outputs)) return;
+		struct WaylandOutput* wlo = wl_container_of(server.outputs.next, wlo, link);
+		output = wlo->wlr_output;
+	}
+
+	lss->surface_node = wlr_scene_layer_surface_v1_create(&server.scene->tree, surface);
+	//FIXME: ULTRA JANKY (0,0) ich muss für das zerscht d outputs besser mache
+	wlr_scene_node_set_position(&lss->surface_node->tree->node, 0, 0);
+	wlr_layer_surface_v1_configure(surface, output->width, output->height);
+
+	//TODO: FREE LAYERSHELL eventually -> memory leak
+}
+
+void layer_shell_delete_surface(struct wl_listener *listener, void *data) {
+	//idk ob ich da was will
+}
 
 	//SETUP
 
@@ -601,14 +651,22 @@ bool waylandSetup() {
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
 
+	//TODO: LAYER SHELL IMPLEMENT das isch für so rofi und so
+	server.layer_shell = wlr_layer_shell_v1_create(server.display, 4);
+	server.new_layer_shell_surface.notify = layer_shell_new_surface;
+	server.delete_layer_shell_surface.notify = layer_shell_delete_surface;
+	wl_signal_add(&server.layer_shell->events.new_surface, &server.new_layer_shell_surface);
+	//FIXME: DELTE isch glaub wenn LAYERSHELL DELTED WIRD nöd die SURFACE
+	wl_signal_add(&server.layer_shell->events.destroy, &server.delete_layer_shell_surface);
+	wl_list_init(&lss_list);
+	//server.layer_shell->events.new_surface
+	
+
     //xdg shell for handling new surfaces
 	server.xdg_shell = wlr_xdg_shell_create(server.display, 3);
 	server.new_xdg_surface.notify = xdg_shell_new_surface_notify;
 	wl_signal_add(&server.xdg_shell->events.new_surface, &server.new_xdg_surface);
-
-	//TODO: LAYER SHELL IMPLEMENT das isch für so rofi und so
-	//server.layer_shell = wlr_layer_shell_v1_create(server.display, 4);
-	//server.layer_shell->events.
+	
 
     //requesting serverside decorations of clients
 	wlr_server_decoration_manager_set_default_mode(
