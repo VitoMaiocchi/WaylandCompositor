@@ -1,3 +1,4 @@
+/*
 #define _POSIX_C_SOURCE 200112L
 #include <assert.h>
 #include <getopt.h>
@@ -28,14 +29,17 @@
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
+*/
 
-#include "layout.h"
+//#include "layout.h"
+#include "includes.hpp"
 #include "config.h"
-#include "wayland.h"
+#include "wayland.hpp"
 #include "surface2.h"
 
-struct WaylandServer server;
+WaylandServer server;
 
+/*
 struct WaylandClient {
 	struct wlr_xdg_toplevel *xdg_toplevel;
 	struct wlr_xdg_surface* xdg_surface;
@@ -51,6 +55,7 @@ struct WaylandClient {
 
 	struct LayoutNode layoutNode;
 };
+*/
 
 struct WaylandKeyboard {
 	struct wl_list link;
@@ -73,7 +78,7 @@ struct WaylandOutput {
 
 
     //CLIENTS AND SURFACES
-
+/*
 static void window_decoration_create(struct WaylandClient* client) {
 	struct wlr_box extends = client->extends;
 
@@ -151,6 +156,7 @@ void client_set_extends(struct LayoutNode* client, const struct wlr_box extends)
 	bool resize = oldext.width != extends.width || oldext.height != extends.height;
 	window_decoration_update(wlClient, resize);
 }
+*/
 /*
 static void client_xdg_surface_map_notify(struct wl_listener* listener, void* data) {
 	struct WaylandClient* client = wl_container_of(listener, client, map);
@@ -235,7 +241,7 @@ static void xdg_shell_new_surface_notify(struct wl_listener* listener, void* dat
 
 
 void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
-	struct wlr_xdg_toplevel_decoration_v1 *dec = data;
+	struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
 	wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 }
 
@@ -256,12 +262,12 @@ void output_frame_notify(struct wl_listener *listener, void *data) {
 void output_request_state_notify(struct wl_listener *listener, void *data) {
     //output state (resolution etc) changes
     struct WaylandOutput *output = wl_container_of(listener, output, request_state);
-	const struct wlr_output_event_request_state *event = data;
+	const struct wlr_output_event_request_state *event = (wlr_output_event_request_state*) data;
 	wlr_output_commit_state(output->wlr_output, event->state);
 
 	output->extends.width = output->wlr_output->width;
 	output->extends.height = output->wlr_output->height;
-	layout_init(output->extends);
+	//layout_init(output->extends);
 }
 
 void output_destroy_notify(struct wl_listener *listener, void *data) {
@@ -275,7 +281,7 @@ void output_destroy_notify(struct wl_listener *listener, void *data) {
 }
 
 void backend_new_output_notify(struct wl_listener *listener, void *data) {
-	struct wlr_output *wlr_output = data;
+	struct wlr_output *wlr_output = (struct wlr_output*) data;
 
 	wlr_output_init_render(wlr_output, server.allocator, server.renderer);
 
@@ -289,7 +295,7 @@ void backend_new_output_notify(struct wl_listener *listener, void *data) {
 	wlr_output_state_finish(&state);
 
 	//create struct
-	struct WaylandOutput *output = calloc(1, sizeof(*output));
+	struct WaylandOutput *output = (WaylandOutput*) calloc(1, sizeof(*output));
 	output->wlr_output = wlr_output;
 	wl_list_insert(&server.outputs, &output->link);
 
@@ -311,12 +317,12 @@ void backend_new_output_notify(struct wl_listener *listener, void *data) {
 	output->extends.height = wlr_output->height;
 	output->extends.x = scene_output->x;
 	output->extends.y = scene_output->y;
-	layout_init(output->extends);
+	//layout_init(output->extends);
 }
 
 
 // INPUT HANDLING
-
+/*
 void cursor_enter_client(struct WaylandClient* client) {
 	wlr_seat_pointer_notify_enter(server.seat, client->xdg_surface->surface, 
 		server.cursor->x - client->surface_node->node.x, server.cursor->y - client->surface_node->node.y);
@@ -326,8 +332,10 @@ void cursor_enter_client(struct WaylandClient* client) {
 void cursor_exit_client(struct WaylandClient* client) {
 	wlr_seat_pointer_clear_focus(server.seat);
 }
+*/
 
 void cursor_process_movement(uint32_t time) {
+	/*
 	struct LayoutNode* clientNode = layout_get_client_at_position(server.cursor->x, server.cursor->y);
 
 	if(!clientNode) {
@@ -348,29 +356,30 @@ void cursor_process_movement(uint32_t time) {
 
 	wlr_seat_pointer_notify_motion(server.seat, time, 
 			server.cursor->x - client->surface_node->node.x, server.cursor->y - client->surface_node->node.y);
+	*/
 }
 
 void cursor_motion_notify(struct wl_listener *listener, void *data) {
-    struct wlr_pointer_motion_event *event = data;
+    struct wlr_pointer_motion_event *event = (wlr_pointer_motion_event *) data;
     wlr_cursor_move(server.cursor, &event->pointer->base, event->delta_x, event->delta_y);
 	cursor_process_movement(event->time_msec);
 	wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default"); //TODO: di göhret nöd da ane
 }
 
 void cursor_motion_absolute_notify(struct wl_listener *listener, void *data) {
-	struct wlr_pointer_motion_absolute_event *event = data;
+	struct wlr_pointer_motion_absolute_event *event = (wlr_pointer_motion_absolute_event *) data;
 	wlr_cursor_warp_absolute(server.cursor, &event->pointer->base, event->x, event->y);
 	cursor_process_movement(event->time_msec);
 	wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
 }
 
 void cursor_button_notify(struct wl_listener *listener, void *data) {
-	struct wlr_pointer_button_event *event = data;
+	struct wlr_pointer_button_event *event = (wlr_pointer_button_event *) data;
 	wlr_seat_pointer_notify_button(server.seat, event->time_msec, event->button, event->state);
 }
 
 void cursor_axis_notify(struct wl_listener *listener, void *data) {
-	struct wlr_pointer_axis_event *event = data;
+	struct wlr_pointer_axis_event *event = (wlr_pointer_axis_event*) data;
 	wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation, 
             event->delta, event->delta_discrete, event->source, event->relative_direction);
 }
@@ -381,7 +390,7 @@ void cursor_frame_notify(struct wl_listener *listener, void *data) {
 
 void seat_request_set_cursor_notify(struct wl_listener *listener, void *data) {
     //client requests set cursor image
-	struct wlr_seat_pointer_request_set_cursor_event *event = data;
+	struct wlr_seat_pointer_request_set_cursor_event *event = (wlr_seat_pointer_request_set_cursor_event *) data;
 	struct wlr_seat_client *focused_client = server.seat->pointer_state.focused_client;
 	/* This can be sent by any client, so we check to make sure this one is
 	 * actually has pointer focus first. */
@@ -395,7 +404,7 @@ void seat_request_set_cursor_notify(struct wl_listener *listener, void *data) {
 }
 
 void seat_request_set_selection_notify(struct wl_listener *listener, void *data) {
-	struct wlr_seat_request_set_selection_event *event = data;
+	struct wlr_seat_request_set_selection_event *event = (wlr_seat_request_set_selection_event *) data;
 	wlr_seat_set_selection(server.seat, event->source, event->serial);
 }
 
@@ -456,7 +465,7 @@ static bool handle_keybinding(xkb_keysym_t sym, uint32_t modmask) {
 static void keyboard_handle_key(struct wl_listener *listener, void *data) {
 	/* This event is raised when a key is pressed or released. */
 	struct WaylandKeyboard *keyboard = wl_container_of(listener, keyboard, key);
-	struct wlr_keyboard_key_event *event = data;
+	struct wlr_keyboard_key_event *event = (wlr_keyboard_key_event *)data;
 	struct wlr_seat *seat = server.seat;
 
 	/* Translate libinput keycode -> xkbcommon */
@@ -497,7 +506,7 @@ static void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
 void add_new_keyboard_device(struct wlr_input_device* device) {
 	struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
 
-	struct WaylandKeyboard *keyboard = calloc(1, sizeof(*keyboard));
+	struct WaylandKeyboard *keyboard = (WaylandKeyboard *) calloc(1, sizeof(*keyboard));
 	keyboard->wlr_keyboard = wlr_keyboard;
 
 	struct xkb_rule_names layout_de = {"", "", "de", "", ""};
@@ -524,7 +533,7 @@ void add_new_keyboard_device(struct wlr_input_device* device) {
 }
 
 void backend_new_input_notify(struct wl_listener *listener, void *data) {
-    struct wlr_input_device *device = data;
+    struct wlr_input_device *device = (wlr_input_device *) data;
 
 	switch (device->type) {
 		case WLR_INPUT_DEVICE_KEYBOARD:
@@ -566,10 +575,10 @@ struct wl_list lss_list;
 
 //LAYER SHELL ULTRA BASIC
 void layer_shell_new_surface(struct wl_listener *listener, void *data) {
-	struct wlr_layer_surface_v1* surface = data;
+	struct wlr_layer_surface_v1* surface = (wlr_layer_surface_v1*) data;
 	if(!surface) return;
 
-	struct LayerShellSurface* lss = calloc(1, sizeof(struct LayerShellSurface));
+	struct LayerShellSurface* lss = (LayerShellSurface* ) calloc(1, sizeof(struct LayerShellSurface));
 	wl_list_insert(&lss_list, &lss->link);
 	lss->ls_surface = surface;
 
@@ -642,7 +651,7 @@ bool waylandSetup() {
 	wlr_log(WLR_DEBUG, "aaah place: %p", &server.display);
 	wlr_log(WLR_DEBUG, "aaah value: %p", server.display);
 	//server.xdg_shell = wlr_xdg_shell_create(server.display, 3);
-	setupSurface(&server);
+	setupSurface();
 
     //requesting serverside decorations of clients
 	wlr_server_decoration_manager_set_default_mode(
@@ -718,6 +727,6 @@ bool waylandSetup() {
 int main() {
 	
 	struct wlr_box box = {0, 0, 1000, 1000};
-	layout_init(box);
+	//layout_init(box);
 	waylandSetup();
 }
