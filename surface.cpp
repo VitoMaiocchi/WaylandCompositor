@@ -1,11 +1,12 @@
 #include "surface.h"
 #include "config.h"
-//extern "C" {
 #include "wayland.hpp"
-//}
+#include "layout.hpp"
 
 #include <wlr/util/log.h>
 #include <cassert>
+
+ToplevelSurface* focused_toplevel = NULL;
 
 ToplevelSurface::ToplevelSurface() {
 	for(uint i = 0; i < 4; i++) border[i] = NULL;
@@ -58,13 +59,66 @@ void ToplevelSurface::setExtends(struct wlr_box extends) {
 	wlr_scene_rect_set_size(border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
 }
 
+void ToplevelSurface::setFocused() {
+	ToplevelSurface* prev = focused_toplevel;
+
+	if(this == prev) return;
+	focused_toplevel = this;
+
+	if(prev) {
+		prev->setActivated(false);
+		for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(prev->border[i], bordercolor_inactive);
+	}
+
+	setActivated(true);
+	for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_active);
+
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
+	if (keyboard) wlr_seat_keyboard_notify_enter(server.seat, getSurface(),
+			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+
+}
+
+void ToplevelSurface::map_notify() {
+	Layout::addSurface(this);
+	setFocused();
+}
+
+void ToplevelSurface::unmap_notify() {
+	debug("UMAP NOTIFY");
+
+	//remove surface from layout
+	ToplevelSurface* next = Layout::removeSurface(this);
+	if(focused_toplevel	== this) {
+		focused_toplevel == NULL;
+		if(next) next->setFocused();
+	}
+
+	//destroy window decorations
+	for(unsigned i = 0; i < 4; i++) {
+		assert(border[i]);
+		wlr_scene_node_destroy(&border[i]->node);
+		border[i] = NULL;
+	}
+}
+
+std::pair<int, int> ToplevelSurface::surfaceCoordinateTransform(int x, int y) {
+	return {x - (extends.x + BORDERWIDTH), y - (extends.y + BORDERWIDTH)};
+}
+
+wlr_surface* XdgToplevelSurface::getSurface() {
+	return xdg_toplevel->base->surface;
+}
+
+void XdgToplevelSurface::setActivated(bool activated) {
+	wlr_xdg_toplevel_set_activated(xdg_toplevel, activated);
+}
 
 void XdgToplevelSurface::setSurfaceSize(uint width, uint height) {
 	wlr_xdg_toplevel_set_size(xdg_toplevel, width, height);
 }
 
 XdgToplevelSurface::XdgToplevelSurface(wlr_xdg_toplevel* xdg_toplevel) {
-
 	debug("TOPLEVEL SURFACE");
 
 	this->xdg_toplevel = xdg_toplevel;
@@ -98,31 +152,12 @@ XdgToplevelSurface::XdgToplevelSurface(wlr_xdg_toplevel* xdg_toplevel) {
 }
 
 XdgToplevelSurface::~XdgToplevelSurface() {
-    //wlr_log(WLR_DEBUG, "destroy surface");
     wlr_scene_node_destroy(&root_node->node);
 
 	wl_list_remove(&map_listener.link);
 	wl_list_remove(&unmap_listener.link);
 	wl_list_remove(&destroy_listener.link);
 }
-
-void ToplevelSurface::map_notify() {
-    struct wlr_box extends = {100, 100, 1000, 800};
-    this->extends = extends;
-	setExtends(extends);
-    //window_decoration_update() private und so nöd richtig
-    //theoretisch set focused
-}
-
-void ToplevelSurface::unmap_notify() {
-	//DESTROY WINDOW DECORATION
-	for(unsigned i = 0; i < 4; i++) {
-		assert(border[i]);
-		wlr_scene_node_destroy(&border[i]->node);
-		border[i] = NULL;
-	}
-}
-
 
 
 void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
@@ -131,23 +166,13 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
 	new XdgToplevelSurface(xdg_toplevel);
 }
 
-
-void setupSurface();
-
-
 void setupSurface() {
-
-
-
-	//assert( (void* )&(server->display) != (void*) server->display);
-	wlr_log(WLR_DEBUG, "server 2: %p", &server);
-	wlr_log(WLR_DEBUG, "aaah place: %p", &server.display );
-	wlr_log(WLR_DEBUG, "aaah value: %p", server.display);
 	debug("SURFACE SETUP");
 	server.xdg_shell = wlr_xdg_shell_create(server.display, 3);
 	
-	//server.new_xdg_surface.notify = xdg_shell_new_surface_notify;
-	//wl_signal_add(&server.xdg_shell->events.new_surface, &server.new_xdg_surface);
+	server.new_xdg_toplevel.notify = new_xdg_toplevel_notify;
+	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);	
+
 	//TODO: DA MÜND NO POPUPS GHANDLED WERDE
 		/*
 		if (xdg_surface->role == WLR_XDG_SURFACE_ROLE_POPUP) {
@@ -158,10 +183,4 @@ void setupSurface() {
 			return;
 		}
 		*/
-	debug("1");
-	server.new_xdg_toplevel.notify = new_xdg_toplevel_notify;
-	debug("2");
-	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);
-	debug("SURFACE SETUP FERTIG");
-	
 }

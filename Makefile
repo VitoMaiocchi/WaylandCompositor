@@ -24,16 +24,16 @@ wlr-layer-shell-unstable-v1-protocol.h:
 #wayland.o: wayland.c layout.h xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface2.h
 #	$(CC) -c $< $(FLAGS)
 
-wayland.o: wayland.cpp xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface2.h
+wayland.o: wayland.cpp xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface.h
 	$(CXX) -c $< $(FLAGS)
 
-#layout.o: layout.c layout.h wayland.h config.h
-#	$(CC) -c $< $(FLAGS)
+layout.o: layout.cpp layout.hpp
+	$(CXX) -c $< $(FLAGS)
 
 surface.o: surface.cpp surface.h wayland.h config.h
 	$(CXX) -c $< $(FLAGS)
 
-VitoWM: wayland.o surface.o
+VitoWM: wayland.o surface.o layout.o
 	$(CXX) -o VitoWM $^ $(LIBS)
 
 clean:

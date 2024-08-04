@@ -4,6 +4,7 @@
 //void client_set_extends(struct LayoutNode* client, const struct wlr_box extends);
 
 #include "includes.hpp"
+#include "surface.h"
 
 struct WaylandServer {
     struct wl_display* display;
@@ -19,7 +20,7 @@ struct WaylandServer {
 
 	struct wlr_cursor* cursor;
 	struct wlr_xcursor_manager* cursor_mgr;
-	struct WaylandClient* pointer_focus;
+	ToplevelSurface* pointer_focus;
 	struct wl_listener cursor_motion;
 	struct wl_listener cursor_motion_absolute;
 	struct wl_listener cursor_button;
