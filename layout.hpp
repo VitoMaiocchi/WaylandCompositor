@@ -2,7 +2,7 @@
 #define VITOWM_LAYOUT_H
 
 #include "includes.hpp"
-#include "surface.h"
+#include "surface.hpp"
 
 namespace Layout {
 

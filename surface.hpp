@@ -8,6 +8,7 @@ class Surface {
     public:
     virtual void setFocused() = 0;
     virtual wlr_surface* getSurface() = 0;
+    bool contains(int x, int y);
 
     protected:
 

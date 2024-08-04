@@ -21,23 +21,21 @@ wlr-layer-shell-unstable-v1-protocol.h:
 	$(WAYLAND_SCANNER) server-header \
 		wlr-layer-shell-unstable-v1.xml $@
 
-#wayland.o: wayland.c layout.h xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface2.h
-#	$(CC) -c $< $(FLAGS)
 
-wayland.o: wayland.cpp xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface.h
+wayland.o: wayland.cpp xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface.hpp
 	$(CXX) -c $< $(FLAGS)
 
 layout.o: layout.cpp layout.hpp
 	$(CXX) -c $< $(FLAGS)
 
-surface.o: surface.cpp surface.h wayland.h config.h
+surface.o: surface.cpp surface.hpp wayland.hpp config.hpp
 	$(CXX) -c $< $(FLAGS)
 
 VitoWM: wayland.o surface.o layout.o
 	$(CXX) -o VitoWM $^ $(LIBS)
 
 clean:
-	rm -f tinywl VitoWM xdg-shell-protocol.h xdg-shell-protocol.c wayland.o layout.o surface.o
+	rm -f VitoWM xdg-shell-protocol.h xdg-shell-protocol.c wayland.o layout.o surface.o
 
 .DEFAULT_GOAL=VitoWM
 .PHONY: clean

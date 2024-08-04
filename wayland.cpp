@@ -33,9 +33,9 @@
 
 //#include "layout.h"
 #include "includes.hpp"
-#include "config.h"
+#include "config.hpp"
 #include "wayland.hpp"
-#include "surface.h"
+#include "surface.hpp"
 #include "layout.hpp"
 
 WaylandServer server;

@@ -1,10 +1,19 @@
-#include "surface.h"
-#include "config.h"
+#include "surface.hpp"
+#include "config.hpp"
 #include "wayland.hpp"
 #include "layout.hpp"
 
 #include <wlr/util/log.h>
 #include <cassert>
+
+bool Surface::contains(int x, int y) {
+	if(extends.x > x) return false;
+	if(extends.x + extends.width < x) return false;
+	if(extends.y > y) return false;
+	if(extends.y + extends.height < y) return false;
+
+	return true;
+}
 
 ToplevelSurface* focused_toplevel = NULL;
 

@@ -4,7 +4,7 @@
 //void client_set_extends(struct LayoutNode* client, const struct wlr_box extends);
 
 #include "includes.hpp"
-#include "surface.h"
+#include "surface.hpp"
 
 struct WaylandServer {
     struct wl_display* display;
