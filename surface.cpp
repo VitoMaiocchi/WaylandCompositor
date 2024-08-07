@@ -69,6 +69,7 @@ void ToplevelSurface::setExtends(struct wlr_box extends) {
 }
 
 void ToplevelSurface::setFocused() {
+	debug("SET FOCUSED BEGIN");
 	ToplevelSurface* prev = focused_toplevel;
 
 	if(this == prev) return;
@@ -86,6 +87,7 @@ void ToplevelSurface::setFocused() {
 	if (keyboard) wlr_seat_keyboard_notify_enter(server.seat, getSurface(),
 			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
 
+	debug("SET FOCUSED END");
 }
 
 void ToplevelSurface::map_notify() {
@@ -99,7 +101,7 @@ void ToplevelSurface::unmap_notify() {
 	//remove surface from layout
 	ToplevelSurface* next = Layout::removeSurface(this);
 	if(focused_toplevel	== this) {
-		focused_toplevel == NULL;
+		focused_toplevel = NULL;
 		if(next) next->setFocused();
 	}
 
