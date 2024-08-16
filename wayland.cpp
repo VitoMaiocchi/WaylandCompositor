@@ -60,11 +60,117 @@ struct WaylandOutput {
 	struct wlr_box extends;
 };
 
+#include <cairo/cairo.h>
+#include <libdrm/drm.h>
+#include <cassert>
+#include <random>
+struct cairo_buffer *buffer;
+struct wlr_scene_buffer *scene_buffer;
 
+struct cairo_buffer {
+	struct wlr_buffer base;
+	cairo_surface_t *surface;
+};
+
+//CAIRO BUFFER
+
+static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
+	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
+	cairo_surface_destroy(buffer->surface);
+	free(buffer);
+}
+
+static bool cairo_buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer,
+		uint32_t flags, void **data, uint32_t *format, size_t *stride) {
+	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
+
+	if (flags & WLR_BUFFER_DATA_PTR_ACCESS_WRITE) {
+		return false;
+	}
+
+	#define fourcc_code(a, b, c, d) ((__u32)(a) | ((__u32)(b) << 8) | \
+					((__u32)(c) << 16) | ((__u32)(d) << 24))
+	#define DRM_FORMAT_ARGB8888	fourcc_code('A', 'R', '2', '4') /* [31:0] A:R:G:B 8:8:8:8 little endian */
+
+	*format = DRM_FORMAT_ARGB8888;
+	*data = cairo_image_surface_get_data(buffer->surface);
+	*stride = cairo_image_surface_get_stride(buffer->surface);
+	return true;
+}
+
+static void cairo_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
+}
+
+static const struct wlr_buffer_impl cairo_buffer_impl = {
+	.destroy = cairo_buffer_destroy,
+	.begin_data_ptr_access = cairo_buffer_begin_data_ptr_access,
+	.end_data_ptr_access = cairo_buffer_end_data_ptr_access
+};
+
+static struct cairo_buffer *create_cairo_buffer(int width, int height) {
+	struct cairo_buffer *buffer = (cairo_buffer*) calloc(1, sizeof(*buffer));
+	if (!buffer) {
+		return NULL;
+	}
+
+	wlr_buffer_init(&buffer->base, &cairo_buffer_impl, width, height);
+
+	buffer->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+			width, height);
+	if (cairo_surface_status(buffer->surface) != CAIRO_STATUS_SUCCESS) {
+		free(buffer);
+		return NULL;
+	}
+
+	return buffer;
+}
+
+
+//CAIRO BUFFER END
 
 void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
 	wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+
+	buffer = create_cairo_buffer(256, 256);
+	assert(buffer);
+
+	std::random_device rd;  // Obtain a random number from hardware
+    std::mt19937 gen(rd()); // Seed the generator
+    std::uniform_real_distribution<> distr(0.0, 1.0); // Define the range
+
+	cairo_t *cr = cairo_create(buffer->surface);
+	cairo_set_source_rgb(cr, distr(gen), distr(gen), distr(gen));
+	cairo_paint(cr);
+	cairo_set_source_rgb(cr, 0, 0, 0);
+
+	double x = 25.6, y = 128.0;
+	double x1 = 102.4, y1 = 230.4,
+			x2 = 153.6, y2 = 25.6,
+			x3 = 230.4, y3 = 128.0;
+
+	cairo_move_to(cr, x, y);
+	cairo_curve_to(cr, x1, y1, x2, y2, x3, y3);
+
+	cairo_set_line_width(cr, 10.0);
+	cairo_stroke(cr);
+
+	cairo_set_source_rgba(cr, 1, 0.2, 0.2, 0.6);
+	cairo_set_line_width(cr, 6.0);
+	cairo_move_to(cr, x, y);
+	cairo_line_to(cr, x1, y1);
+	cairo_move_to(cr, x2, y2);
+	cairo_line_to(cr, x3, y3);
+	cairo_stroke(cr);
+
+	cairo_destroy(cr);
+	/* End drawing */
+
+	wlr_scene_buffer_set_buffer(scene_buffer, &buffer->base);
+
+	//wlr_scene_node_set_position(&scene_buffer->node, 50, 50);
+	
+	wlr_buffer_drop(&buffer->base);
 }
 
     // OUTPUTS (MONITORS)
@@ -421,69 +527,6 @@ void layer_shell_delete_surface(struct wl_listener *listener, void *data) {
     return 1;                           \
 }
 
-//CAIRO BUFFER
-
-#include <cairo/cairo.h>
-#include <libdrm/drm.h>
-
-struct cairo_buffer {
-	struct wlr_buffer base;
-	cairo_surface_t *surface;
-};
-
-static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
-	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
-	cairo_surface_destroy(buffer->surface);
-	free(buffer);
-}
-
-static bool cairo_buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer,
-		uint32_t flags, void **data, uint32_t *format, size_t *stride) {
-	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
-
-	if (flags & WLR_BUFFER_DATA_PTR_ACCESS_WRITE) {
-		return false;
-	}
-
-	#define fourcc_code(a, b, c, d) ((__u32)(a) | ((__u32)(b) << 8) | \
-					((__u32)(c) << 16) | ((__u32)(d) << 24))
-	#define DRM_FORMAT_ARGB8888	fourcc_code('A', 'R', '2', '4') /* [31:0] A:R:G:B 8:8:8:8 little endian */
-	
-	*format = DRM_FORMAT_ARGB8888;
-	*data = cairo_image_surface_get_data(buffer->surface);
-	*stride = cairo_image_surface_get_stride(buffer->surface);
-	return true;
-}
-
-static void cairo_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
-}
-
-static const struct wlr_buffer_impl cairo_buffer_impl = {
-	.destroy = cairo_buffer_destroy,
-	.begin_data_ptr_access = cairo_buffer_begin_data_ptr_access,
-	.end_data_ptr_access = cairo_buffer_end_data_ptr_access
-};
-
-static struct cairo_buffer *create_cairo_buffer(int width, int height) {
-	struct cairo_buffer *buffer = (cairo_buffer*) calloc(1, sizeof(*buffer));
-	if (!buffer) {
-		return NULL;
-	}
-
-	wlr_buffer_init(&buffer->base, &cairo_buffer_impl, width, height);
-
-	buffer->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
-			width, height);
-	if (cairo_surface_status(buffer->surface) != CAIRO_STATUS_SUCCESS) {
-		free(buffer);
-		return NULL;
-	}
-
-	return buffer;
-}
-
-
-//CAIRO BUFFER END
 
 bool waylandSetup() {
     wlr_log_init(WLR_DEBUG, NULL);
@@ -581,7 +624,7 @@ bool waylandSetup() {
 
 	//CAIRO 
 
-	struct cairo_buffer *buffer = create_cairo_buffer(256, 256);
+	buffer = create_cairo_buffer(256, 256);
 	if (!buffer) {
 		wl_display_destroy(server.display);
 		return EXIT_FAILURE;
@@ -616,7 +659,7 @@ bool waylandSetup() {
 	cairo_destroy(cr);
 	/* End drawing */
 
-	struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_create(
+	scene_buffer = wlr_scene_buffer_create(
 			&server.scene->tree, &buffer->base);
 	if (!scene_buffer) {
 		wl_display_destroy(server.display);
@@ -624,8 +667,8 @@ bool waylandSetup() {
 	}
 
 	wlr_scene_node_set_position(&scene_buffer->node, 50, 50);
+	
 	wlr_buffer_drop(&buffer->base);
-
 
 	//CAIRO END
 
