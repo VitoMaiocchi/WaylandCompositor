@@ -29,6 +29,8 @@ namespace Layout {
     }
 
     void setScreenExtends(wlr_box extends) {
+        extends.y += 30;
+        extends.height -= 30;
         screen_ext = extends;
         updateLayout();
     }

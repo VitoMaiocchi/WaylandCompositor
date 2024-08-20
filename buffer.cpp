@@ -75,7 +75,7 @@ void Buffer::setPosition(int x, int y) {
 
 void Buffer::draw(std::function<void(cairo_t*)> draw) {
 
-    cairo_buffer* buffer = create_cairo_buffer(256, 256);
+    cairo_buffer* buffer = create_cairo_buffer(extends.width, extends.height);
 	assert(buffer);
 	cairo_t *cr = cairo_create(buffer->surface);
 

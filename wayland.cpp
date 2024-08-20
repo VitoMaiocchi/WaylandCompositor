@@ -1,37 +1,3 @@
-/*
-#define _POSIX_C_SOURCE 200112L
-#include <assert.h>
-#include <getopt.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <unistd.h>
-#include <wayland-server-core.h>
-#include <wlr/backend.h>
-#include <wlr/render/allocator.h>
-#include <wlr/render/wlr_renderer.h>
-#include <wlr/types/wlr_cursor.h>
-#include <wlr/types/wlr_compositor.h>
-#include <wlr/types/wlr_data_device.h>
-#include <wlr/types/wlr_input_device.h>
-#include <wlr/types/wlr_keyboard.h>
-#include <wlr/types/wlr_output.h>
-#include <wlr/types/wlr_output_layout.h>
-#include <wlr/types/wlr_pointer.h>
-#include <wlr/types/wlr_scene.h>
-#include <wlr/types/wlr_seat.h>
-#include <wlr/types/wlr_subcompositor.h>
-#include <wlr/types/wlr_xcursor_manager.h>
-#include <wlr/types/wlr_xdg_shell.h>
-#include <wlr/types/wlr_xdg_decoration_v1.h>
-#include <wlr/types/wlr_server_decoration.h>
-#include <wlr/types/wlr_layer_shell_v1.h>
-#include <wlr/util/log.h>
-#include <xkbcommon/xkbcommon.h>
-*/
-
-//#include "layout.h"
 #include "includes.hpp"
 #include "config.hpp"
 #include "wayland.hpp"
@@ -72,7 +38,14 @@ void draw(cairo_t* cr) {
 
 	cairo_set_source_rgb(cr, distr(gen), distr(gen), distr(gen));
 	cairo_paint(cr);
+
+	cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+	cairo_set_font_size (cr, 20.0);
+
 	cairo_set_source_rgb(cr, 0, 0, 0);
+	cairo_move_to (cr, 200.0, 25.0);
+	cairo_show_text (cr, "Ich habe gerade 100'000 Euro auf bravolotto gewonnen");
+	/*
 
 	double x = 25.6, y = 128.0;
 	double x1 = 102.4, y1 = 230.4,
@@ -92,6 +65,7 @@ void draw(cairo_t* cr) {
 	cairo_move_to(cr, x2, y2);
 	cairo_line_to(cr, x3, y3);
 	cairo_stroke(cr);
+	*/
 }
 
 Buffer* buffer;
@@ -553,7 +527,7 @@ bool waylandSetup() {
 
 
 	//CAIRO 
-	wlr_box ext = {50, 50, 256, 256};
+	wlr_box ext = {0, 0, 1000, 30};
 	buffer = new Buffer(&server.scene->tree, ext);
 
 	//CAIRO END
