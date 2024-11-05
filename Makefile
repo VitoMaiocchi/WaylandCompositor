@@ -38,7 +38,10 @@ buffer.o: buffer.cpp buffer.hpp
 output.o: output.cpp output.hpp wayland.hpp layout.hpp
 	$(CXX) -c $< $(FLAGS)
 
-VitoWM: wayland.o surface.o layout.o buffer.o output.o
+input.o: input.cpp input.hpp wayland.hpp layout.hpp
+	$(CXX) -c $< $(FLAGS)
+
+VitoWM: wayland.o surface.o layout.o buffer.o output.o input.o
 	$(CXX) -o VitoWM $^ $(LIBS)
 
 clean:
