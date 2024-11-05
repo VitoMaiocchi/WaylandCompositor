@@ -29,23 +29,26 @@ wayland.o: wayland.cpp xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol
 layout.o: layout.cpp layout.hpp
 	$(CXX) -c $< $(FLAGS)
 
-surface.o: surface.cpp surface.hpp wayland.hpp config.hpp
+surface.o: surface.cpp surface.hpp  config.hpp
 	$(CXX) -c $< $(FLAGS)
 
 buffer.o: buffer.cpp buffer.hpp
 	$(CXX) -c $< $(FLAGS)
 
-output.o: output.cpp output.hpp wayland.hpp layout.hpp
+output.o: output.cpp output.hpp  layout.hpp
 	$(CXX) -c $< $(FLAGS)
 
-input.o: input.cpp input.hpp wayland.hpp layout.hpp
+input.o: input.cpp input.hpp layout.hpp
 	$(CXX) -c $< $(FLAGS)
 
-VitoWM: wayland.o surface.o layout.o buffer.o output.o input.o
+server.o: server.cpp server.hpp output.hpp input.hpp surface.hpp
+	$(CXX) -c $< $(FLAGS)
+
+VitoWM: wayland.o surface.o layout.o buffer.o output.o input.o server.o
 	$(CXX) -o VitoWM $^ $(LIBS)
 
 clean:
-	rm -f VitoWM xdg-shell-protocol.h xdg-shell-protocol.c wayland.o layout.o surface.o
+	rm -f VitoWM xdg-shell-protocol.h xdg-shell-protocol.c *.o
 
 .DEFAULT_GOAL=VitoWM
 .PHONY: clean

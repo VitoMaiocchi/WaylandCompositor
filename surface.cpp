@@ -1,10 +1,16 @@
 #include "surface.hpp"
 #include "config.hpp"
-#include "wayland.hpp"
 #include "layout.hpp"
+#include "input.hpp"
+#include "output.hpp"
+#include "server.hpp"
 
 #include <wlr/util/log.h>
 #include <cassert>
+
+struct wlr_xdg_shell *xdg_shell;
+struct wl_listener new_xdg_surface;
+struct wl_listener new_xdg_toplevel;
 
 bool Surface::contains(int x, int y) {
 	if(extends.x > x) return false;
@@ -83,8 +89,8 @@ void ToplevelSurface::setFocused() {
 	setActivated(true);
 	for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_active);
 
-	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server.seat);
-	if (keyboard) wlr_seat_keyboard_notify_enter(server.seat, getSurface(),
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(Input::seat);
+	if (keyboard) wlr_seat_keyboard_notify_enter(Input::seat, getSurface(),
 			keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
 
 	debug("SET FOCUSED END");
@@ -133,7 +139,7 @@ XdgToplevelSurface::XdgToplevelSurface(wlr_xdg_toplevel* xdg_toplevel) {
 	debug("TOPLEVEL SURFACE");
 
 	this->xdg_toplevel = xdg_toplevel;
-    root_node = wlr_scene_tree_create(&server.scene->tree);
+    root_node = wlr_scene_tree_create(&Output::scene->tree);
 	surface_node = wlr_scene_xdg_surface_create(root_node, xdg_toplevel->base);
 	//xdg_surface->data = surface_node;   //WEISS NÖD OB DAS MIT EM REDESIGN NÖTIG ISCH
                                         //evtl isch gschider da XdgTopLevel ane mache
@@ -179,10 +185,10 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
 
 void setupSurface() {
 	debug("SURFACE SETUP");
-	server.xdg_shell = wlr_xdg_shell_create(server.display, 3);
+	xdg_shell = wlr_xdg_shell_create(Server::display, 3);
 	
-	server.new_xdg_toplevel.notify = new_xdg_toplevel_notify;
-	wl_signal_add(&server.xdg_shell->events.new_toplevel, &server.new_xdg_toplevel);	
+	new_xdg_toplevel.notify = new_xdg_toplevel_notify;
+	wl_signal_add(&xdg_shell->events.new_toplevel, &new_xdg_toplevel);	
 
 	//TODO: DA MÜND NO POPUPS GHANDLED WERDE
 		/*

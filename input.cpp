@@ -1,77 +1,94 @@
 #include "input.hpp"
 #include "includes.hpp"
-#include "wayland.hpp"
 #include "layout.hpp"
+#include "server.hpp"
+#include "output.hpp"
 
 namespace Input {
 
-    struct WaylandKeyboard {
-        struct wl_list link;
-        struct wlr_keyboard *wlr_keyboard;
+    wlr_cursor* cursor;
+	wlr_xcursor_manager* cursor_mgr;
+	ToplevelSurface* pointer_focus;
+	wl_listener cursor_motion;
+	wl_listener cursor_motion_absolute;
+	wl_listener cursor_button;
+	wl_listener cursor_axis;
+	wl_listener cursor_frame;
 
-        struct wl_listener modifiers;
-        struct wl_listener key;
-        struct wl_listener destroy;
+    wlr_seat* seat;
+
+	wl_listener new_input;
+	wl_listener request_cursor;
+	wl_listener request_set_selection;
+	wl_list keyboards;
+
+    struct WaylandKeyboard {
+        wl_list link;
+        wlr_keyboard *wlr_keyboard;
+
+        wl_listener modifiers;
+        wl_listener key;
+        wl_listener destroy;
     };
 
     // INPUT HANDLING
     void cursor_process_movement(uint32_t time) {
-        ToplevelSurface* surface = Layout::getSurfaceAtPosition(server.cursor->x, server.cursor->y);
+        ToplevelSurface* surface = Layout::getSurfaceAtPosition(cursor->x, cursor->y);
 
         if(!surface) {
-            if(server.pointer_focus) {
-                wlr_seat_pointer_clear_focus(server.seat);
-                server.pointer_focus = NULL;
+            if(pointer_focus) {
+                wlr_seat_pointer_clear_focus(seat);
+                pointer_focus = NULL;
             }
             return;
         }
         
-        std::pair<int, int> cursor_cords = surface->surfaceCoordinateTransform(server.cursor->x, server.cursor->y);
+        std::pair<int, int> cursor_cords = surface->surfaceCoordinateTransform(cursor->x, cursor->y);
 
-        if(server.pointer_focus != surface) {
-            if(server.pointer_focus) wlr_seat_pointer_clear_focus(server.seat);
-            server.pointer_focus = surface;
-            wlr_seat_pointer_notify_enter(server.seat, surface->getSurface(), cursor_cords.first, cursor_cords.second);
+        if(pointer_focus != surface) {
+            if(pointer_focus) wlr_seat_pointer_clear_focus(seat);
+            pointer_focus = surface;
+            wlr_seat_pointer_notify_enter(seat, surface->getSurface(), cursor_cords.first, cursor_cords.second);
             surface->setFocused();
         }
 
-        wlr_seat_pointer_notify_motion(server.seat, time, cursor_cords.first, cursor_cords.second);
+        wlr_seat_pointer_notify_motion(seat, time, cursor_cords.first, cursor_cords.second);
         
     }
 
     void cursor_motion_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_motion_event *event = (wlr_pointer_motion_event *) data;
-        wlr_cursor_move(server.cursor, &event->pointer->base, event->delta_x, event->delta_y);
+        wlr_cursor_move(cursor, &event->pointer->base, event->delta_x, event->delta_y);
         cursor_process_movement(event->time_msec);
-        wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default"); //TODO: di göhret nöd da ane
+        wlr_cursor_set_xcursor(cursor, cursor_mgr, "default"); //TODO: di göhret nöd da ane
     }
 
     void cursor_motion_absolute_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_motion_absolute_event *event = (wlr_pointer_motion_absolute_event *) data;
-        wlr_cursor_warp_absolute(server.cursor, &event->pointer->base, event->x, event->y);
+        wlr_cursor_warp_absolute(cursor, &event->pointer->base, event->x, event->y);
         cursor_process_movement(event->time_msec);
-        wlr_cursor_set_xcursor(server.cursor, server.cursor_mgr, "default");
+        wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
     }
 
     void cursor_button_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_button_event *event = (wlr_pointer_button_event *) data;
-        wlr_seat_pointer_notify_button(server.seat, event->time_msec, event->button, event->state);
+        wlr_seat_pointer_notify_button(seat, event->time_msec, event->button, event->state);
     }
 
     void cursor_axis_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_axis_event *event = (wlr_pointer_axis_event*) data;
-        wlr_seat_pointer_notify_axis(server.seat, event->time_msec, event->orientation, 
+        wlr_seat_pointer_notify_axis(seat, event->time_msec, event->orientation, 
                 event->delta, event->delta_discrete, event->source, event->relative_direction);
     }
 
     void cursor_frame_notify(struct wl_listener *listener, void *data) {
-        wlr_seat_pointer_notify_frame(server.seat);
+        wlr_seat_pointer_notify_frame(seat);
     }
 
     void seat_request_set_cursor_notify(struct wl_listener *listener, void *data) {
         //client requests set cursor image
         struct wlr_seat_pointer_request_set_cursor_event *event = (wlr_seat_pointer_request_set_cursor_event *) data;
-        struct wlr_seat_client *focused_client = server.seat->pointer_state.focused_client;
+        struct wlr_seat_client *focused_client = seat->pointer_state.focused_client;
         /* This can be sent by any client, so we check to make sure this one is
         * actually has pointer focus first. */
         if (focused_client == event->seat_client) {
@@ -79,17 +96,17 @@ namespace Input {
             * provided surface as the cursor image. It will set the hardware cursor
             * on the output that it's currently on and continue to do so as the
             * cursor moves between outputs. */
-            wlr_cursor_set_surface(server.cursor, event->surface, event->hotspot_x, event->hotspot_y);
+            wlr_cursor_set_surface(cursor, event->surface, event->hotspot_x, event->hotspot_y);
         }
     }
 
     void seat_request_set_selection_notify(struct wl_listener *listener, void *data) {
         struct wlr_seat_request_set_selection_event *event = (wlr_seat_request_set_selection_event *) data;
-        wlr_seat_set_selection(server.seat, event->source, event->serial);
+        wlr_seat_set_selection(seat, event->source, event->serial);
     }
 
     void add_new_pointer_device(struct wlr_input_device* device) {
-        wlr_cursor_attach_input_device(server.cursor, device);
+        wlr_cursor_attach_input_device(cursor, device);
     }
 
     static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
@@ -102,9 +119,9 @@ namespace Input {
         * same seat. You can swap out the underlying wlr_keyboard like this and
         * wlr_seat handles this transparently.
         */
-        wlr_seat_set_keyboard(server.seat, keyboard->wlr_keyboard);
+        wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
         /* Send modifiers to the client. */
-        wlr_seat_keyboard_notify_modifiers(server.seat, &keyboard->wlr_keyboard->modifiers);
+        wlr_seat_keyboard_notify_modifiers(seat, &keyboard->wlr_keyboard->modifiers);
     }
 
     //return true if the keybind exists
@@ -117,7 +134,7 @@ namespace Input {
         wlr_log(WLR_DEBUG, "WITH WIN KEY PRESSED = %i", sym);
 
         if((modmask & WLR_MODIFIER_SHIFT) && sym == XKB_KEY_Q) {
-            wl_display_terminate(server.display);
+            wl_display_terminate(Server::display);
             return true;
         }
 
@@ -146,7 +163,6 @@ namespace Input {
         /* This event is raised when a key is pressed or released. */
         struct WaylandKeyboard *keyboard = wl_container_of(listener, keyboard, key);
         struct wlr_keyboard_key_event *event = (wlr_keyboard_key_event *)data;
-        struct wlr_seat *seat = server.seat;
 
         /* Translate libinput keycode -> xkbcommon */
         uint32_t keycode = event->keycode + 8;
@@ -164,6 +180,9 @@ namespace Input {
 
         if (!handled) {
             /* Otherwise, we pass it along to the client. */
+            assert(keyboard);
+            assert(keyboard->wlr_keyboard);
+            assert(seat);
             wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
             wlr_seat_keyboard_notify_key(seat, event->time_msec,
                 event->keycode, event->state);
@@ -208,8 +227,8 @@ namespace Input {
         wl_signal_add(&device->events.destroy, &keyboard->destroy);
 
 
-        wlr_seat_set_keyboard(server.seat, keyboard->wlr_keyboard);
-        wl_list_insert(&server.keyboards, &keyboard->link);
+        wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
+        wl_list_insert(&keyboards, &keyboard->link);
     }
 
     void backend_new_input_notify(struct wl_listener *listener, void *data) {
@@ -227,35 +246,39 @@ namespace Input {
         }
 
         uint32_t caps = WL_SEAT_CAPABILITY_POINTER;
-        if (!wl_list_empty(&server.keyboards)) caps |= WL_SEAT_CAPABILITY_KEYBOARD;
-        wlr_seat_set_capabilities(server.seat, caps);
+        if (!wl_list_empty(&keyboards)) caps |= WL_SEAT_CAPABILITY_KEYBOARD;
+        wlr_seat_set_capabilities(seat, caps);
     }
 
     void setup() {
-        server.cursor = wlr_cursor_create();
-        wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
+        cursor = wlr_cursor_create();
+        wlr_cursor_attach_output_layout(cursor, Output::output_layout);
 
-        server.cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
+        cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
 
-        server.cursor_motion.notify = cursor_motion_notify;
-        server.cursor_motion_absolute.notify = cursor_motion_absolute_notify;
-        server.cursor_button.notify = cursor_button_notify;
-        server.cursor_axis.notify = cursor_axis_notify;
-        server.cursor_frame.notify = cursor_frame_notify;
-        wl_signal_add(&server.cursor->events.motion, &server.cursor_motion);
-        wl_signal_add(&server.cursor->events.motion_absolute, &server.cursor_motion_absolute);
-        wl_signal_add(&server.cursor->events.button, &server.cursor_button);
-        wl_signal_add(&server.cursor->events.axis, &server.cursor_axis);
-        wl_signal_add(&server.cursor->events.frame, &server.cursor_frame);
+        cursor_motion.notify = cursor_motion_notify;
+        cursor_motion_absolute.notify = cursor_motion_absolute_notify;
+        cursor_button.notify = cursor_button_notify;
+        cursor_axis.notify = cursor_axis_notify;
+        cursor_frame.notify = cursor_frame_notify;
+        wl_signal_add(&cursor->events.motion, &cursor_motion);
+        wl_signal_add(&cursor->events.motion_absolute, &cursor_motion_absolute);
+        wl_signal_add(&cursor->events.button, &cursor_button);
+        wl_signal_add(&cursor->events.axis, &cursor_axis);
+        wl_signal_add(&cursor->events.frame, &cursor_frame);
 
-        wl_list_init(&server.keyboards);
-        server.new_input.notify = backend_new_input_notify;
-        wl_signal_add(&server.backend->events.new_input, &server.new_input);
+        wl_list_init(&keyboards);
+        new_input.notify = backend_new_input_notify;
+        wl_signal_add(&Server::backend->events.new_input, &new_input);
 
-        server.seat = wlr_seat_create(server.display, "seat0");
-        server.request_cursor.notify = seat_request_set_cursor_notify;
-        server.request_set_selection.notify = seat_request_set_selection_notify;
-        wl_signal_add(&server.seat->events.request_set_cursor, &server.request_cursor);
-        wl_signal_add(&server.seat->events.request_set_selection, &server.request_set_selection);
+        seat = wlr_seat_create(Server::display, "seat0");
+        request_cursor.notify = seat_request_set_cursor_notify;
+        request_set_selection.notify = seat_request_set_selection_notify;
+        wl_signal_add(&seat->events.request_set_cursor, &request_cursor);
+        wl_signal_add(&seat->events.request_set_selection, &request_set_selection);
+    }
+
+    void cleanup() {
+        wlr_xcursor_manager_destroy(cursor_mgr);
     }
 }
