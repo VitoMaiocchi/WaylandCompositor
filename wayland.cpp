@@ -45,27 +45,6 @@ void draw(cairo_t* cr) {
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_move_to (cr, 200.0, 25.0);
 	cairo_show_text (cr, "Ich habe gerade 100'000 Euro auf bravolotto gewonnen");
-	/*
-
-	double x = 25.6, y = 128.0;
-	double x1 = 102.4, y1 = 230.4,
-			x2 = 153.6, y2 = 25.6,
-			x3 = 230.4, y3 = 128.0;
-
-	cairo_move_to(cr, x, y);
-	cairo_curve_to(cr, x1, y1, x2, y2, x3, y3);
-
-	cairo_set_line_width(cr, 10.0);
-	cairo_stroke(cr);
-
-	cairo_set_source_rgba(cr, 1, 0.2, 0.2, 0.6);
-	cairo_set_line_width(cr, 6.0);
-	cairo_move_to(cr, x, y);
-	cairo_line_to(cr, x1, y1);
-	cairo_move_to(cr, x2, y2);
-	cairo_line_to(cr, x3, y3);
-	cairo_stroke(cr);
-	*/
 }
 
 Buffer* buffer;
@@ -74,7 +53,7 @@ void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
 	wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 
-	buffer->draw(draw);
+	buffer->draw(draw, 1000, 30);
 }
 
     // OUTPUTS (MONITORS)
@@ -527,8 +506,8 @@ bool waylandSetup() {
 
 
 	//CAIRO 
-	wlr_box ext = {0, 0, 1000, 30};
-	buffer = new Buffer(&server.scene->tree, ext);
+	buffer = new Buffer(&server.scene->tree);
+	buffer->setPosition(0,0);
 
 	//CAIRO END
 

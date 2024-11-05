@@ -66,6 +66,9 @@ extern "C" {
     #include <xkbcommon/xkbcommon.h>
 
     #include <wlr/interfaces/wlr_buffer.h>
+
+    #include <cairo/cairo.h>
+    #include <cassert>
     /*
 #include <wlr/backend.h>
 #include <wlr/backend/libinput.h>

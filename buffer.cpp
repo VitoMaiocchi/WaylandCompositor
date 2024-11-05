@@ -59,23 +59,18 @@ static struct cairo_buffer *create_cairo_buffer(int width, int height) {
 
 
 
-Buffer::Buffer(wlr_scene_tree* parent, wlr_box extends) {
-    this->extends = extends;
-
+Buffer::Buffer(wlr_scene_tree* parent) {
     scene_buffer = wlr_scene_buffer_create(parent, NULL);
 	assert(scene_buffer);
-	wlr_scene_node_set_position(&scene_buffer->node, extends.x, extends.y);
 }
 
 void Buffer::setPosition(int x, int y) {
-    extends.x = x;
-    extends.y = y;
-    wlr_scene_node_set_position(&scene_buffer->node, extends.x, extends.y);
+    wlr_scene_node_set_position(&scene_buffer->node, x, y);
 }
 
-void Buffer::draw(std::function<void(cairo_t*)> draw) {
+void Buffer::draw(std::function<void(cairo_t*)> draw, uint width, uint height) {
 
-    cairo_buffer* buffer = create_cairo_buffer(extends.width, extends.height);
+    cairo_buffer* buffer = create_cairo_buffer(width, height);
 	assert(buffer);
 	cairo_t *cr = cairo_create(buffer->surface);
 
