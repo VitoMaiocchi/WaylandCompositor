@@ -4,6 +4,7 @@
 #include "surface.hpp"
 #include "layout.hpp"
 #include "buffer.hpp"
+#include "output.hpp"
 
 WaylandServer server;
 
@@ -17,19 +18,11 @@ struct WaylandKeyboard {
 	struct wl_listener destroy;
 };
 
-struct WaylandOutput {
-	struct wl_list link;
-	struct wlr_output *wlr_output;
-	struct wl_listener frame;
-	struct wl_listener request_state;
-	struct wl_listener destroy;
-
-	struct wlr_box extends;
-};
-
 #include <cairo/cairo.h>
 #include <cassert>
 #include <random>
+#include <memory>
+#include "titlebar.hpp"
 
 void draw(cairo_t* cr) {
 	std::random_device rd;  // Obtain a random number from hardware
@@ -47,92 +40,13 @@ void draw(cairo_t* cr) {
 	cairo_show_text (cr, "Ich habe gerade 100'000 Euro auf bravolotto gewonnen");
 }
 
-Buffer* buffer;
+std::unique_ptr<Buffer> buffer;
 
 void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
 	struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
 	wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 
 	buffer->draw(draw, 1000, 30);
-}
-
-    // OUTPUTS (MONITORS)
-
-void output_frame_notify(struct wl_listener *listener, void *data) {
-    //render frame
-	struct WaylandOutput *output = wl_container_of(listener, output, frame);
-
-	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(server.scene, output->wlr_output);
-	wlr_scene_output_commit(scene_output, NULL);
-
-	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	wlr_scene_output_send_frame_done(scene_output, &now);
-}
-
-void output_request_state_notify(struct wl_listener *listener, void *data) {
-    //output state (resolution etc) changes
-    struct WaylandOutput *output = wl_container_of(listener, output, request_state);
-	const struct wlr_output_event_request_state *event = (wlr_output_event_request_state*) data;
-	wlr_output_commit_state(output->wlr_output, event->state);
-
-	output->extends.width = output->wlr_output->width;
-	output->extends.height = output->wlr_output->height;
-
-	//layout_init(output->extends);
-	Layout::setScreenExtends(output->extends);
-}
-
-void output_destroy_notify(struct wl_listener *listener, void *data) {
-	struct WaylandOutput *output = wl_container_of(listener, output, destroy);
-
-	wl_list_remove(&output->frame.link);
-	wl_list_remove(&output->request_state.link);
-	wl_list_remove(&output->destroy.link);
-	wl_list_remove(&output->link);
-	free(output);
-}
-
-void backend_new_output_notify(struct wl_listener *listener, void *data) {
-	struct wlr_output *wlr_output = (struct wlr_output*) data;
-
-	wlr_output_init_render(wlr_output, server.allocator, server.renderer);
-
-    //configure output state: ultra basic da chan den so advancte shit ane.
-	struct wlr_output_state state;
-	struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
-	wlr_output_state_init(&state);
-	wlr_output_state_set_enabled(&state, true);
-	if (mode) wlr_output_state_set_mode(&state, mode);
-	wlr_output_commit_state(wlr_output, &state);
-	wlr_output_state_finish(&state);
-
-	//create struct
-	struct WaylandOutput *output = (WaylandOutput*) calloc(1, sizeof(*output));
-	output->wlr_output = wlr_output;
-	wl_list_insert(&server.outputs, &output->link);
-
-    //Listeners
-	output->frame.notify = output_frame_notify;
-	output->request_state.notify = output_request_state_notify;
-	output->destroy.notify = output_destroy_notify;
-	wl_signal_add(&wlr_output->events.frame, &output->frame);
-	wl_signal_add(&wlr_output->events.request_state, &output->request_state);
-	wl_signal_add(&wlr_output->events.destroy, &output->destroy);
-
-
-    //basic output configuration. das chani den no advanced mache.
-	struct wlr_output_layout_output *l_output = wlr_output_layout_add_auto(server.output_layout, wlr_output);
-	struct wlr_scene_output *scene_output = wlr_scene_output_create(server.scene, wlr_output);
-	wlr_scene_output_layout_add_output(server.scene_layout, l_output, scene_output);
-
-	output->extends.width = wlr_output->width;
-	output->extends.height = wlr_output->height;
-	output->extends.x = scene_output->x;
-	output->extends.y = scene_output->y;
-
-	//layout_init(output->extends);
-	Layout::setScreenExtends(output->extends);
 }
 
 
@@ -376,6 +290,7 @@ struct wl_list lss_list;
 
 
 //LAYER SHELL ULTRA BASIC
+/*
 void layer_shell_new_surface(struct wl_listener *listener, void *data) {
 	struct wlr_layer_surface_v1* surface = (wlr_layer_surface_v1*) data;
 	if(!surface) return;
@@ -398,6 +313,7 @@ void layer_shell_new_surface(struct wl_listener *listener, void *data) {
 
 	//TODO: FREE LAYERSHELL eventually -> memory leak
 }
+*/
 
 void layer_shell_delete_surface(struct wl_listener *listener, void *data) {
 	//idk ob ich da was will
@@ -430,15 +346,13 @@ bool waylandSetup() {
 	wlr_subcompositor_create(server.display);
 	wlr_data_device_manager_create(server.display);
 
-	server.output_layout = wlr_output_layout_create(server.display);
-	wl_list_init(&server.outputs);
-	server.new_output_listener.notify = backend_new_output_notify;
-	wl_signal_add(&server.backend->events.new_output, &server.new_output_listener);
+	Output::setup();
 
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
 
 	//TODO: LAYER SHELL IMPLEMENT das isch für so rofi und so
+	/*
 	server.layer_shell = wlr_layer_shell_v1_create(server.display, 4);
 	server.new_layer_shell_surface.notify = layer_shell_new_surface;
 	server.delete_layer_shell_surface.notify = layer_shell_delete_surface;
@@ -447,6 +361,7 @@ bool waylandSetup() {
 	wl_signal_add(&server.layer_shell->events.destroy, &server.delete_layer_shell_surface);
 	wl_list_init(&lss_list);
 	//server.layer_shell->events.new_surface
+	*/
 	
 	wlr_log(WLR_DEBUG, "AHHH");
 
@@ -506,7 +421,7 @@ bool waylandSetup() {
 
 
 	//CAIRO 
-	buffer = new Buffer(&server.scene->tree);
+	buffer = std::make_unique<Buffer>(&server.scene->tree);
 	buffer->setPosition(0,0);
 
 	//CAIRO END
@@ -526,7 +441,6 @@ bool waylandSetup() {
 	wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s", socket);
 	wl_display_run(server.display);
 
-	delete buffer;
 	wl_display_destroy_clients(server.display);
 	wlr_scene_node_destroy(&server.scene->tree.node);
 	wlr_xcursor_manager_destroy(server.cursor_mgr);
