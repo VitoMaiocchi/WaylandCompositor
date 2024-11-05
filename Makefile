@@ -23,28 +23,14 @@ wlr-layer-shell-unstable-v1-protocol.h:
 		wlr-layer-shell-unstable-v1.xml $@
 
 
-wayland.o: wayland.cpp xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h surface.hpp buffer.hpp
+SRCS = $(wildcard *.cpp)
+OBJS = $(SRCS:.cpp=.o)
+HEADERS = $(wildcard *.hpp)
+
+%.o: %.cpp $(HEADERS) xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h
 	$(CXX) -c $< $(FLAGS)
 
-layout.o: layout.cpp layout.hpp
-	$(CXX) -c $< $(FLAGS)
-
-surface.o: surface.cpp surface.hpp  config.hpp
-	$(CXX) -c $< $(FLAGS)
-
-buffer.o: buffer.cpp buffer.hpp
-	$(CXX) -c $< $(FLAGS)
-
-output.o: output.cpp output.hpp  layout.hpp
-	$(CXX) -c $< $(FLAGS)
-
-input.o: input.cpp input.hpp layout.hpp
-	$(CXX) -c $< $(FLAGS)
-
-server.o: server.cpp server.hpp output.hpp input.hpp surface.hpp
-	$(CXX) -c $< $(FLAGS)
-
-VitoWM: wayland.o surface.o layout.o buffer.o output.o input.o server.o
+VitoWM: $(OBJS)
 	$(CXX) -o VitoWM $^ $(LIBS)
 
 clean:
