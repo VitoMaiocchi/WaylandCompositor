@@ -4,6 +4,7 @@
 #include "server.hpp"
 
 #include <functional>
+#include <algorithm>
 
 //TEST
 void draw(cairo_t* cr) {
@@ -19,29 +20,59 @@ void draw(cairo_t* cr) {
 }
 
 namespace Output {
-	wl_list outputs;
+
+	//MONITOR BEGIN
 	wl_listener new_output_listener;
 	wlr_scene_output_layout* scene_layout;
 	wlr_output_layout* output_layout;
     wlr_scene* scene;
+	std::list<Monitor*> monitors;
 
-	struct WaylandOutput {
-		struct wl_list link;
-		struct wlr_output *wlr_output;
-		struct wl_listener frame;
-		struct wl_listener request_state;
-		struct wl_listener destroy;
+	struct MonitorListeners {
+		Monitor* monitor;
 
-		struct wlr_box extends;
+		wl_listener frame;
+		wl_listener request_state;
+		wl_listener destroy;
 	};
 
-		// OUTPUTS (MONITORS)
 
-	void output_frame_notify(struct wl_listener *listener, void *data) {
-		//render frame
-		struct WaylandOutput *output = wl_container_of(listener, output, frame);
+	Monitor::Monitor(wlr_output* output) {
+		this->output = output;
 
-		struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
+		wlr_output_init_render(output, Server::allocator, Server::renderer);
+
+		//configure output state: ultra basic da chan den so advancte shit ane.
+		struct wlr_output_state state;
+		struct wlr_output_mode *mode = wlr_output_preferred_mode(output);
+		wlr_output_state_init(&state);
+		wlr_output_state_set_enabled(&state, true);
+		if (mode) wlr_output_state_set_mode(&state, mode);
+		wlr_output_commit_state(output, &state);
+		wlr_output_state_finish(&state);
+
+		//basic output configuration. das chani den no advanced mache.
+		struct wlr_output_layout_output *l_output = wlr_output_layout_add_auto(output_layout, output);
+		struct wlr_scene_output *scene_output = wlr_scene_output_create(scene, output);
+		wlr_scene_output_layout_add_output(scene_layout, l_output, scene_output);
+
+		extends.width = output->width;
+		extends.height = output->height;
+		extends.x = scene_output->x;
+		extends.y = scene_output->y;
+
+		//layout_init(output->extends);
+		Layout::setScreenExtends(extends);
+
+		//TEST
+		Buffer* buffer = new Buffer();
+		Extends ext = extends;
+		ext.height = 30;
+		buffer->draw(draw, ext);
+	}
+
+	void Monitor::frameNotify() {
+		wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output);
 		wlr_scene_output_commit(scene_output, NULL);
 
 		struct timespec now;
@@ -49,80 +80,56 @@ namespace Output {
 		wlr_scene_output_send_frame_done(scene_output, &now);
 	}
 
-	void output_request_state_notify(struct wl_listener *listener, void *data) {
-		//output state (resolution etc) changes
-		struct WaylandOutput *output = wl_container_of(listener, output, request_state);
-		const struct wlr_output_event_request_state *event = (wlr_output_event_request_state*) data;
-		wlr_output_commit_state(output->wlr_output, event->state);
+	void Monitor::updateState(const wlr_output_state* state) {
+		wlr_output_commit_state(output, state);
 
-		output->extends.width = output->wlr_output->width;
-		output->extends.height = output->wlr_output->height;
+		extends.width = output->width;
+		extends.height = output->height;
 
-		//layout_init(output->extends);
-		Layout::setScreenExtends(output->extends);
-	}
-
-	void output_destroy_notify(struct wl_listener *listener, void *data) {
-		struct WaylandOutput *output = wl_container_of(listener, output, destroy);
-
-		wl_list_remove(&output->frame.link);
-		wl_list_remove(&output->request_state.link);
-		wl_list_remove(&output->destroy.link);
-		wl_list_remove(&output->link);
-		free(output);
+		Layout::setScreenExtends(extends);
 	}
 
 	void backend_new_output_notify(struct wl_listener *listener, void *data) {
 		struct wlr_output *wlr_output = (struct wlr_output*) data;
 
-		wlr_output_init_render(wlr_output, Server::allocator, Server::renderer);
-
-		//configure output state: ultra basic da chan den so advancte shit ane.
-		struct wlr_output_state state;
-		struct wlr_output_mode *mode = wlr_output_preferred_mode(wlr_output);
-		wlr_output_state_init(&state);
-		wlr_output_state_set_enabled(&state, true);
-		if (mode) wlr_output_state_set_mode(&state, mode);
-		wlr_output_commit_state(wlr_output, &state);
-		wlr_output_state_finish(&state);
-
-		//create struct
-		struct WaylandOutput *output = (WaylandOutput*) calloc(1, sizeof(*output));
-		output->wlr_output = wlr_output;
-		wl_list_insert(&outputs, &output->link);
+		MonitorListeners* listeners = new MonitorListeners();
+		listeners->monitor = new Monitor(wlr_output);
+		monitors.push_back(listeners->monitor);
 
 		//Listeners
-		output->frame.notify = output_frame_notify;
-		output->request_state.notify = output_request_state_notify;
-		output->destroy.notify = output_destroy_notify;
-		wl_signal_add(&wlr_output->events.frame, &output->frame);
-		wl_signal_add(&wlr_output->events.request_state, &output->request_state);
-		wl_signal_add(&wlr_output->events.destroy, &output->destroy);
+		listeners->frame.notify = [](struct wl_listener *listener, void *data){
+			MonitorListeners* listeners = wl_container_of(listener, listeners, frame);
+			listeners->monitor->frameNotify();
+		};
 
+		listeners->request_state.notify = [](struct wl_listener *listener, void *data){
+			MonitorListeners* listeners = wl_container_of(listener, listeners, request_state);
+			const wlr_output_event_request_state *event = (wlr_output_event_request_state*) data;
+			listeners->monitor->updateState(event->state);
+		};
 
-		//basic output configuration. das chani den no advanced mache.
-		struct wlr_output_layout_output *l_output = wlr_output_layout_add_auto(output_layout, wlr_output);
-		struct wlr_scene_output *scene_output = wlr_scene_output_create(scene, wlr_output);
-		wlr_scene_output_layout_add_output(scene_layout, l_output, scene_output);
+		listeners->destroy.notify = [](struct wl_listener *listener, void *data){
+			MonitorListeners* listeners = wl_container_of(listener, listeners, destroy);
+			wl_list_remove(&listeners->frame.link);
+			wl_list_remove(&listeners->request_state.link);
+			wl_list_remove(&listeners->destroy.link);
 
-		output->extends.width = wlr_output->width;
-		output->extends.height = wlr_output->height;
-		output->extends.x = scene_output->x;
-		output->extends.y = scene_output->y;
+			auto it = std::find(monitors.begin(), monitors.end(), listeners->monitor);
+			assert(it != monitors.end());
+			monitors.erase(it);
 
-		//layout_init(output->extends);
-		Layout::setScreenExtends(output->extends);
+			delete listeners->monitor;
+			delete listeners;
+		};
 
-		//TEST
-		Buffer* buffer = new Buffer();
-		Extends ext = output->extends;
-		ext.height = 30;
-		buffer->draw(draw, ext);
+		wl_signal_add(&wlr_output->events.frame, &listeners->frame);
+		wl_signal_add(&wlr_output->events.request_state, &listeners->request_state);
+		wl_signal_add(&wlr_output->events.destroy, &listeners->destroy);
 	}
 
     void setup() {
         output_layout = wlr_output_layout_create(Server::display);
-        wl_list_init(&outputs);
+
         new_output_listener.notify = backend_new_output_notify;
         wl_signal_add(&Server::backend->events.new_output, &new_output_listener);
 
@@ -134,6 +141,15 @@ namespace Output {
         wlr_scene_node_destroy(&scene->tree.node);
         wlr_output_layout_destroy(output_layout);
     }
+
+	//MONITOR END
+
+
+
+
+
+
+
 
 
 
@@ -193,8 +209,6 @@ namespace Output {
 
 		return buffer;
 	}
-
-
 
 	Buffer::Buffer() {
 		scene_buffer = wlr_scene_buffer_create(&scene->tree, NULL);
