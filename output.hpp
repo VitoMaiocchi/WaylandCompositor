@@ -1,6 +1,8 @@
 #pragma once
 
 #include "includes.hpp"
+#include "util.hpp"
+#include <functional>
 
 namespace Output {
 
@@ -9,4 +11,13 @@ namespace Output {
 
     void setup();
     void cleanup();
+
+    class Buffer {
+        public:
+            Buffer();
+            ~Buffer();
+            void draw(std::function<void(cairo_t*)> draw, Extends ext);
+        private:
+            wlr_scene_buffer* scene_buffer;
+    };
 }

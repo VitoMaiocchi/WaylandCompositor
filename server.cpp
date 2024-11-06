@@ -3,34 +3,13 @@
 #include "output.hpp"
 #include "surface.hpp"
 #include "input.hpp"
-#include "buffer.hpp"
 
 #include <random> //nur debug
 
 namespace Server {
-    void draw(cairo_t* cr) {
-        std::random_device rd;  // Obtain a random number from hardware
-        std::mt19937 gen(rd()); // Seed the generator
-        std::uniform_real_distribution<> distr(0.0, 1.0); // Define the range
-
-        cairo_set_source_rgb(cr, distr(gen), distr(gen), distr(gen));
-        cairo_paint(cr);
-
-        cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-        cairo_set_font_size (cr, 20.0);
-
-        cairo_set_source_rgb(cr, 0, 0, 0);
-        cairo_move_to (cr, 200.0, 25.0);
-        cairo_show_text (cr, "Ich habe gerade 100'000 Euro auf bravolotto gewonnen");
-    }
-
-    std::unique_ptr<Buffer> buffer;
-
     void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
         struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
         wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
-
-        buffer->draw(draw, 1000, 30);
     }
 
 
@@ -81,11 +60,11 @@ namespace Server {
 
         //TODO: FREE LAYERSHELL eventually -> memory leak
     }
-    */
 
     void layer_shell_delete_surface(struct wl_listener *listener, void *data) {
         //idk ob ich da was will
     }
+    */
 
         //SETUP
 
@@ -162,11 +141,6 @@ namespace Server {
             wl_display_destroy(display);
             return 1;
         }
-
-        //CAIRO 
-        buffer = std::make_unique<Buffer>(&Output::scene->tree);
-        buffer->setPosition(0,0);
-        //CAIRO END
 
         setenv("WAYLAND_DISPLAY", socket, true);
 

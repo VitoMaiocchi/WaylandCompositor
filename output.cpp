@@ -3,6 +3,21 @@
 #include "layout.hpp"
 #include "server.hpp"
 
+#include <functional>
+
+//TEST
+void draw(cairo_t* cr) {
+	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
+	cairo_paint(cr);
+
+	cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+	cairo_set_font_size (cr, 20.0);
+
+	cairo_set_source_rgb(cr, 0, 0, 0);
+	cairo_move_to (cr, 200.0, 25.0);
+	cairo_show_text (cr, "Ich habe gerade 100'000 Euro auf bravolotto gewonnen");
+}
+
 namespace Output {
 	wl_list outputs;
 	wl_listener new_output_listener;
@@ -97,8 +112,13 @@ namespace Output {
 
 		//layout_init(output->extends);
 		Layout::setScreenExtends(output->extends);
-	}
 
+		//TEST
+		Buffer* buffer = new Buffer();
+		Extends ext = output->extends;
+		ext.height = 30;
+		buffer->draw(draw, ext);
+	}
 
     void setup() {
         output_layout = wlr_output_layout_create(Server::display);
@@ -114,4 +134,88 @@ namespace Output {
         wlr_scene_node_destroy(&scene->tree.node);
         wlr_output_layout_destroy(output_layout);
     }
+
+
+
+	//BUFFER
+	struct cairo_buffer {
+		struct wlr_buffer base;
+		cairo_surface_t *surface;
+	};
+
+	static void cairo_buffer_destroy(struct wlr_buffer *wlr_buffer) {
+		struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
+		cairo_surface_destroy(buffer->surface);
+		free(buffer);
+	}
+
+	static bool cairo_buffer_begin_data_ptr_access(struct wlr_buffer *wlr_buffer,
+			uint32_t flags, void **data, uint32_t *format, size_t *stride) {
+		struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
+
+		if (flags & WLR_BUFFER_DATA_PTR_ACCESS_WRITE) {
+			return false;
+		}
+
+		#define fourcc_code(a, b, c, d) ((__u32)(a) | ((__u32)(b) << 8) | \
+						((__u32)(c) << 16) | ((__u32)(d) << 24))
+		#define DRM_FORMAT_ARGB8888	fourcc_code('A', 'R', '2', '4') /* [31:0] A:R:G:B 8:8:8:8 little endian */
+
+		*format = DRM_FORMAT_ARGB8888;
+		*data = cairo_image_surface_get_data(buffer->surface);
+		*stride = cairo_image_surface_get_stride(buffer->surface);
+		return true;
+	}
+
+	static void cairo_buffer_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
+	}
+
+	static const struct wlr_buffer_impl cairo_buffer_impl = {
+		.destroy = cairo_buffer_destroy,
+		.begin_data_ptr_access = cairo_buffer_begin_data_ptr_access,
+		.end_data_ptr_access = cairo_buffer_end_data_ptr_access
+	};
+
+	static struct cairo_buffer *create_cairo_buffer(int width, int height) {
+		struct cairo_buffer *buffer = (cairo_buffer*) calloc(1, sizeof(*buffer));
+		if (!buffer) {
+			return NULL;
+		}
+
+		wlr_buffer_init(&buffer->base, &cairo_buffer_impl, width, height);
+
+		buffer->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
+				width, height);
+		if (cairo_surface_status(buffer->surface) != CAIRO_STATUS_SUCCESS) {
+			free(buffer);
+			return NULL;
+		}
+
+		return buffer;
+	}
+
+
+
+	Buffer::Buffer() {
+		scene_buffer = wlr_scene_buffer_create(&scene->tree, NULL);
+		assert(scene_buffer);
+	}
+
+	Buffer::~Buffer() {
+		//TODO
+	}
+
+	void Buffer::draw(std::function<void(cairo_t*)> draw, Extends ext) {
+		wlr_scene_node_set_position(&scene_buffer->node, ext.x, ext.y);
+
+		cairo_buffer* buffer = create_cairo_buffer(ext.width, ext.height);
+		assert(buffer);
+		cairo_t *cr = cairo_create(buffer->surface);
+
+		draw(cr);
+
+		cairo_destroy(cr);
+		wlr_scene_buffer_set_buffer(scene_buffer, &buffer->base);
+		wlr_buffer_drop(&buffer->base);
+	}
 }
