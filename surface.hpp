@@ -21,18 +21,14 @@ class ToplevelSurface : public Surface {
     void setExtends(struct wlr_box extends);
     void setFocused();
     ToplevelSurface();
+    virtual ~ToplevelSurface();
     std::pair<int, int> surfaceCoordinateTransform(int x, int y);
+    void map_notify();
+    void unmap_notify();
 
     protected:
     virtual void setSurfaceSize(uint width, uint height) = 0;
     virtual void setActivated(bool activated) = 0; 
-    void map_notify();
-    void unmap_notify();
-
-
-    struct wl_listener map_listener;
-	struct wl_listener unmap_listener;
-	struct wl_listener destroy_listener;
 
     struct wlr_scene_tree* surface_node; //Surface node: holds the surface itself without decorations
 	struct wlr_scene_rect* border[4]; // Borders of the window in the following order: top, bottom, left, right

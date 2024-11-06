@@ -147,43 +147,56 @@ XdgToplevelSurface::XdgToplevelSurface(wlr_xdg_toplevel* xdg_toplevel) {
 	//xdg_surface->data = surface_node;   //WEISS NÖD OB DAS MIT EM REDESIGN NÖTIG ISCH
                                         //evtl isch gschider da XdgTopLevel ane mache
 
-    	//CONFIGURE LISTENERS
-    map_listener.notify = [](struct wl_listener* listener, void* data) {
-		debug("MAP SURFACE");
-        XdgToplevelSurface* surface = wl_container_of(listener, surface, map_listener);
-        surface->map_notify();
-    };
-
-    unmap_listener.notify = [](struct wl_listener* listener, void* data) {
-		debug("UMAP SURFACE");
-        XdgToplevelSurface* surface = wl_container_of(listener, surface, unmap_listener);
-        surface->unmap_notify();
-    };
-
-    destroy_listener.notify = [](struct wl_listener* listener, void* data) {
-		debug("DESTROY SURFACE");
-        XdgToplevelSurface* surface = wl_container_of(listener, surface, destroy_listener);
-        delete surface;
-    };
-
-	wl_signal_add(&xdg_toplevel->base->surface->events.map, 		&map_listener);
-	wl_signal_add(&xdg_toplevel->base->surface->events.unmap, 		&unmap_listener);
-	wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&destroy_listener);
 }
+
+ToplevelSurface::~ToplevelSurface() {}
 
 XdgToplevelSurface::~XdgToplevelSurface() {
     wlr_scene_node_destroy(&root_node->node);
-
-	wl_list_remove(&map_listener.link);
-	wl_list_remove(&unmap_listener.link);
-	wl_list_remove(&destroy_listener.link);
 }
 
+struct TopLevelListeners {
+	ToplevelSurface* toplevel;
+
+	struct wl_listener map_listener;
+	struct wl_listener unmap_listener;
+	struct wl_listener destroy_listener;
+};
 
 void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
 	debug("NEW XDG TOPLEVEL NOTIFY");
 	wlr_xdg_toplevel* xdg_toplevel = (wlr_xdg_toplevel*) data;
-	new XdgToplevelSurface(xdg_toplevel);
+	TopLevelListeners* listeners = new TopLevelListeners();
+	listeners->toplevel = new XdgToplevelSurface(xdg_toplevel);
+
+	    	//CONFIGURE LISTENERS
+    listeners->map_listener.notify = [](struct wl_listener* listener, void* data) {
+		debug("MAP SURFACE");
+		TopLevelListeners* listeners = wl_container_of(listener, listeners, map_listener);
+		listeners->toplevel->map_notify();
+    };
+
+    listeners->unmap_listener.notify = [](struct wl_listener* listener, void* data) {
+		debug("UMAP SURFACE");
+        TopLevelListeners* listeners = wl_container_of(listener, listeners, unmap_listener);
+        listeners->toplevel->unmap_notify();
+    };
+
+    listeners->destroy_listener.notify = [](struct wl_listener* listener, void* data) {
+		debug("DESTROY SURFACE");
+        TopLevelListeners* listeners = wl_container_of(listener, listeners, destroy_listener);
+        delete listeners->toplevel;
+
+		wl_list_remove(&listeners->map_listener.link);
+		wl_list_remove(&listeners->unmap_listener.link);
+		wl_list_remove(&listeners->destroy_listener.link);
+
+		delete listeners;
+    };
+
+	wl_signal_add(&xdg_toplevel->base->surface->events.map, 		&listeners->map_listener);
+	wl_signal_add(&xdg_toplevel->base->surface->events.unmap, 		&listeners->unmap_listener);
+	wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&listeners->destroy_listener);
 }
 
 void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
