@@ -54,11 +54,6 @@ namespace Server {
 
         setenv("WAYLAND_DISPLAY", socket, true);
 
-        if (fork() == 0) {
-            execl("/bin/sh", "/bin/sh", "-c", "foot", (void *)NULL);
-            return 0;
-        }
-
         /* Run the Wayland event loop. This does not return until you exit the
         * compositor. Starting the backend rigged up all of the necessary event
         * loop configuration to listen to libinput events, DRM events, generate

@@ -3,6 +3,7 @@
 #include "layout.hpp"
 #include "server.hpp"
 #include "output.hpp"
+#include <map>
 
 namespace Input {
 
@@ -109,6 +110,19 @@ namespace Input {
         wlr_cursor_attach_input_device(cursor, device);
     }
 
+
+    //KEYBOARD
+
+    std::map<uint64_t, ShortcutCallback> shortcut_callbacks; 
+
+    inline uint64_t getShortCutHash(xkb_keysym_t sym, uint32_t modmask) {
+        return ((uint64_t)modmask << 32) | sym;
+    }
+
+    void registerKeyCallback(xkb_keysym_t sym, uint32_t modmask, ShortcutCallback callback) {
+        shortcut_callbacks[getShortCutHash(sym, modmask)] = callback;
+    }
+
     static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
         /* This event is raised when a modifier key, such as shift or alt, is
         * pressed. We simply communicate this to the client. */
@@ -126,36 +140,9 @@ namespace Input {
 
     //return true if the keybind exists
     static bool handle_keybinding(xkb_keysym_t sym, uint32_t modmask) {
-
-        //printf("KEY PRESSED: %i", sym);
-        wlr_log(WLR_DEBUG, "KEY PRESSED = %i", sym);
-        if(!(modmask & WLR_MODIFIER_LOGO)) return false;
-
-        wlr_log(WLR_DEBUG, "WITH WIN KEY PRESSED = %i", sym);
-
-        if((modmask & WLR_MODIFIER_SHIFT) && sym == XKB_KEY_Q) {
-            wl_display_terminate(Server::display);
-            return true;
-        }
-
-        switch (sym) {
-        case XKB_KEY_p:
-        case XKB_KEY_space:
-            if (fork() == 0) {
-                execl("/bin/sh", "/bin/sh", "-c", "wofi --show drun", (void *)NULL);
-                return 0;
-            }
-            break;
-        case XKB_KEY_o:
-        case XKB_KEY_KP_Enter:
-            if (fork() == 0) {
-                execl("/bin/sh", "/bin/sh", "-c", "foot", (void *)NULL);
-                return 0;
-            }
-            break;
-        default:
-            return false;
-        }
+        auto it = shortcut_callbacks.find(getShortCutHash(sym, modmask));
+        if(it == shortcut_callbacks.end()) return false;
+        it->second(sym, modmask);
         return true;
     }
 
