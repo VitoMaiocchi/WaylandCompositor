@@ -9,12 +9,12 @@ namespace Layout {
 void setScreenExtends(wlr_box extends); //TMP
 
 //adds surface to layout
-void addSurface(ToplevelSurface* surface);
+void addSurface(Surface::Toplevel* surface);
 //removes surface from layout. Returns NULL or the next surface to focus
 //EIG CHÖNT MER DA AU void return und direkt focus da handle
-ToplevelSurface* removeSurface(ToplevelSurface* surface); 
+Surface::Toplevel* removeSurface(Surface::Toplevel* surface); 
 //returns topmost surface at given position or NULL
-ToplevelSurface* getSurfaceAtPosition(const int x, const int y);
+Surface::Toplevel* getSurfaceAtPosition(const int x, const int y);
 
 }
 

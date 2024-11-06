@@ -8,7 +8,7 @@ namespace Input {
 
     wlr_cursor* cursor;
 	wlr_xcursor_manager* cursor_mgr;
-	ToplevelSurface* pointer_focus;
+	Surface::Toplevel* pointer_focus;
 	wl_listener cursor_motion;
 	wl_listener cursor_motion_absolute;
 	wl_listener cursor_button;
@@ -33,7 +33,7 @@ namespace Input {
 
     // INPUT HANDLING
     void cursor_process_movement(uint32_t time) {
-        ToplevelSurface* surface = Layout::getSurfaceAtPosition(cursor->x, cursor->y);
+        Surface::Toplevel* surface = Layout::getSurfaceAtPosition(cursor->x, cursor->y);
 
         if(!surface) {
             if(pointer_focus) {

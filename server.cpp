@@ -35,7 +35,7 @@ namespace Server {
 
 
         Output::setup();        
-        setupSurface();
+        Surface::setup();
         Input::setup();
 
 

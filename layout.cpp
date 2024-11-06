@@ -6,7 +6,7 @@
 namespace Layout {
 
     wlr_box screen_ext = {0,0,0,0};
-    std::list<ToplevelSurface*> surfaces;
+    std::list<Surface::Toplevel*> surfaces;
 
     void updateLayout() {
         debug("UPDATE LAYOUT");
@@ -35,13 +35,13 @@ namespace Layout {
         updateLayout();
     }
 
-    void addSurface(ToplevelSurface* surface) {
+    void addSurface(Surface::Toplevel* surface) {
         debug("ADD SURFACE");
         surfaces.push_back(surface);
         updateLayout();
     }
 
-    ToplevelSurface* removeSurface(ToplevelSurface* surface) {
+    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) {
         auto it = std::find(surfaces.begin(), surfaces.end(), surface);
         assert(it != surfaces.end());
 
@@ -52,7 +52,7 @@ namespace Layout {
         return *surfaces.begin();
     }
 
-    ToplevelSurface* getSurfaceAtPosition(const int x, const int y) {
+    Surface::Toplevel* getSurfaceAtPosition(const int x, const int y) {
         for(auto i = surfaces.begin(); i != surfaces.end(); i++) if((*i)->contains(x,y)) return *i;
         return NULL;
     }
