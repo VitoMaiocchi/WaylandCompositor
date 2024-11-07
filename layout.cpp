@@ -27,7 +27,7 @@ namespace Layout {
             i++;
         }
 
-        debug("AHHH");
+        debug("UPDATE LAYOUT end");
     }
 
     void setScreenExtends(wlr_box extends) {
@@ -38,6 +38,7 @@ namespace Layout {
     }
 
     void inline setFocus(Surface::Toplevel* surface) {
+        debug("SET FOCUS");
         if(!surface) return;
         if(focused_toplevel) {
             if(focused_toplevel == surface) return;
@@ -46,6 +47,7 @@ namespace Layout {
         }
         focused_toplevel = surface;
         surface->setFocus(true);
+        debug("SET FOCUS end");
     }
 
     void addSurface(Surface::Toplevel* surface) {
@@ -53,6 +55,7 @@ namespace Layout {
         surfaces.push_back(surface);
         updateLayout();
         setFocus(surface);
+        debug("ADD SURFACE end");
     }
 
     void removeSurface(Surface::Toplevel* surface) {
@@ -63,7 +66,10 @@ namespace Layout {
         updateLayout();
 
         if(surface == focused_toplevel) {
-            if(surfaces.begin() == surfaces.end()) return;
+            if(surfaces.begin() == surfaces.end()) {
+                focused_toplevel = nullptr;
+                return;
+            }
 
             if(it != surfaces.end()) focused_toplevel = *it;
             else focused_toplevel = *surfaces.begin();

@@ -7,7 +7,7 @@
 namespace Surface {
     class Base {
         public:
-        virtual void setFocus(bool focus) = 0;  //TODO: da setFocused(bool) und focus bi layout ane tue
+        virtual void setFocus(bool focus) = 0;
         virtual wlr_surface* getSurface() = 0;
         bool contains(int x, int y);
         virtual std::pair<int, int> surfaceCoordinateTransform(int x, int y) = 0;
