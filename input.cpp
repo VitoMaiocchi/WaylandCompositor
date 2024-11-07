@@ -9,7 +9,7 @@ namespace Input {
 
     wlr_cursor* cursor;
 	wlr_xcursor_manager* cursor_mgr;
-	Surface::Toplevel* pointer_focus;
+	Surface::Base* pointer_focus;
 	wl_listener cursor_motion;
 	wl_listener cursor_motion_absolute;
 	wl_listener cursor_button;
@@ -32,10 +32,13 @@ namespace Input {
         wl_listener destroy;
     };
 
-    // INPUT HANDLING
-    void cursor_process_movement(uint32_t time) {
-        Surface::Toplevel* surface = Layout::getSurfaceAtPosition(cursor->x, cursor->y);
+    void setKeyboardFocus(Surface::Base* surface) {
+		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(Input::seat);
+		if (keyboard) wlr_seat_keyboard_notify_enter(Input::seat, surface->getSurface(),
+				keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
+    }
 
+    void setCursorFocus(Surface::Base* surface) {
         if(!surface) {
             if(pointer_focus) {
                 wlr_seat_pointer_clear_focus(seat);
@@ -43,18 +46,22 @@ namespace Input {
             }
             return;
         }
-        
-        std::pair<int, int> cursor_cords = surface->surfaceCoordinateTransform(cursor->x, cursor->y);
 
         if(pointer_focus != surface) {
             if(pointer_focus) wlr_seat_pointer_clear_focus(seat);
             pointer_focus = surface;
+            std::pair<int, int> cursor_cords = surface->surfaceCoordinateTransform(cursor->x, cursor->y);
             wlr_seat_pointer_notify_enter(seat, surface->getSurface(), cursor_cords.first, cursor_cords.second);
-            surface->setFocused();
         }
+    }
 
-        wlr_seat_pointer_notify_motion(seat, time, cursor_cords.first, cursor_cords.second);
+    // INPUT HANDLING
+    void cursor_process_movement(uint32_t time) {
+        Layout::handleCursorMovement(cursor->x, cursor->y);
+        if(!pointer_focus) return;
         
+        std::pair<int, int> cursor_cords = pointer_focus->surfaceCoordinateTransform(cursor->x, cursor->y);
+        wlr_seat_pointer_notify_motion(seat, time, cursor_cords.first, cursor_cords.second);
     }
 
     void cursor_motion_notify(struct wl_listener *listener, void *data) {

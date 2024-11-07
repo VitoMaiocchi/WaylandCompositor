@@ -10,12 +10,10 @@ namespace Layout {
 
     //adds surface to layout
     void addSurface(Surface::Toplevel* surface);
-    //removes surface from layout. Returns NULL or the next surface to focus
-    //EIG CHÖNT MER DA AU void return und direkt focus da handle
-    Surface::Toplevel* removeSurface(Surface::Toplevel* surface); 
-    //returns topmost surface at given position or NULL
-    Surface::Toplevel* getSurfaceAtPosition(const int x, const int y);
+    //removes surface from layout.
+    void removeSurface(Surface::Toplevel* surface); 
 
+    void handleCursorMovement(const double x, const double y);
 }
 
 #endif

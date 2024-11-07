@@ -25,8 +25,6 @@ namespace Surface {
 		return true;
 	}
 
-	Toplevel* focused_toplevel = NULL;
-
 	Toplevel::Toplevel() {
 		for(uint i = 0; i < 4; i++) border[i] = NULL;
 		extends = {0,0,0,0};
@@ -78,42 +76,29 @@ namespace Surface {
 		wlr_scene_rect_set_size(border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
 	}
 
-	void Toplevel::setFocused() {
-		debug("SET FOCUSED BEGIN");
-		Toplevel* prev = focused_toplevel;
-
-		if(this == prev) return;
-		focused_toplevel = this;
-
-		if(prev) {
-			prev->setActivated(false);
-			for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(prev->border[i], bordercolor_inactive);
+	void Toplevel::setFocus(bool focus) {
+		if(!focus) debug("UNFOCUS");
+		if(focus) debug("FOCUS");
+		setActivated(focus);
+		if(!focus) {
+			for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_inactive);
+			return;
 		}
 
-		setActivated(true);
 		for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_active);
 
-		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(Input::seat);
-		if (keyboard) wlr_seat_keyboard_notify_enter(Input::seat, getSurface(),
-				keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
-
-		debug("SET FOCUSED END");
+		Input::setKeyboardFocus(this);
 	}
 
 	void Toplevel::map_notify() {
 		Layout::addSurface(this);
-		setFocused();
 	}
 
 	void Toplevel::unmap_notify() {
 		debug("UMAP NOTIFY");
 
 		//remove surface from layout
-		Toplevel* next = Layout::removeSurface(this);
-		if(focused_toplevel	== this) {
-			focused_toplevel = NULL;
-			if(next) next->setFocused();
-		}
+		Layout::removeSurface(this);
 
 		//destroy window decorations
 		for(unsigned i = 0; i < 4; i++) {

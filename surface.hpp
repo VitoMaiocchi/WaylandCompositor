@@ -1,25 +1,27 @@
 #pragma once
 
 #include "includes.hpp"
+#include "util.hpp"
 #include <utility>
 
 namespace Surface {
     class Base {
         public:
-        virtual void setFocused() = 0;
+        virtual void setFocus(bool focus) = 0;  //TODO: da setFocused(bool) und focus bi layout ane tue
         virtual wlr_surface* getSurface() = 0;
         bool contains(int x, int y);
+        virtual std::pair<int, int> surfaceCoordinateTransform(int x, int y) = 0;
 
         protected:
 
-        struct wlr_box extends; //size of the window including the borders
-        struct wlr_scene_tree* root_node; //Root node of the Window. It is the parent of the surface and the borders
+        Extends extends; //size of the window including the borders
+        wlr_scene_tree* root_node; //Root node of the Window. It is the parent of the surface and the borders
     };
 
     class Toplevel : public Base {
         public:
         void setExtends(struct wlr_box extends);
-        void setFocused();
+        void setFocus(bool focus);
         Toplevel();
         virtual ~Toplevel();
         std::pair<int, int> surfaceCoordinateTransform(int x, int y);

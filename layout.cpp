@@ -1,4 +1,5 @@
 #include "layout.hpp"
+#include "input.hpp"
 #include <list>
 #include <algorithm>
 #include <cassert>
@@ -7,6 +8,7 @@ namespace Layout {
 
     wlr_box screen_ext = {0,0,0,0};
     std::list<Surface::Toplevel*> surfaces;
+    Surface::Toplevel* focused_toplevel;
 
     void updateLayout() {
         debug("UPDATE LAYOUT");
@@ -35,25 +37,49 @@ namespace Layout {
         updateLayout();
     }
 
+    void inline setFocus(Surface::Toplevel* surface) {
+        if(!surface) return;
+        if(focused_toplevel) {
+            if(focused_toplevel == surface) return;
+            focused_toplevel->setFocus(false);
+            focused_toplevel = surface;
+        }
+        focused_toplevel = surface;
+        surface->setFocus(true);
+    }
+
     void addSurface(Surface::Toplevel* surface) {
         debug("ADD SURFACE");
         surfaces.push_back(surface);
         updateLayout();
+        setFocus(surface);
     }
 
-    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) {
+    void removeSurface(Surface::Toplevel* surface) {
         auto it = std::find(surfaces.begin(), surfaces.end(), surface);
         assert(it != surfaces.end());
 
         it = surfaces.erase(it);
         updateLayout();
-        if(it != surfaces.end()) return *it;
-        if(surfaces.begin() == surfaces.end()) return NULL;
-        return *surfaces.begin();
+
+        if(surface == focused_toplevel) {
+            if(surfaces.begin() == surfaces.end()) return;
+
+            if(it != surfaces.end()) focused_toplevel = *it;
+            else focused_toplevel = *surfaces.begin();
+            
+            focused_toplevel->setFocus(true);
+        }
     }
 
     Surface::Toplevel* getSurfaceAtPosition(const int x, const int y) {
         for(auto i = surfaces.begin(); i != surfaces.end(); i++) if((*i)->contains(x,y)) return *i;
         return NULL;
+    }
+
+    void handleCursorMovement(const double x, const double y) {
+        auto surface = getSurfaceAtPosition(x,y);
+        setFocus(surface);
+        Input::setCursorFocus(surface);
     }
 }
