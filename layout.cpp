@@ -38,7 +38,6 @@ namespace Layout {
     }
 
     void inline setFocus(Surface::Toplevel* surface) {
-        debug("SET FOCUS");
         if(!surface) return;
         if(focused_toplevel) {
             if(focused_toplevel == surface) return;
@@ -47,7 +46,6 @@ namespace Layout {
         }
         focused_toplevel = surface;
         surface->setFocus(true);
-        debug("SET FOCUS end");
     }
 
     void addSurface(Surface::Toplevel* surface) {

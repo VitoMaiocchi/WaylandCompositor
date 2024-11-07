@@ -4,6 +4,7 @@
 #include "util.hpp"
 #include <functional>
 #include <list>
+#include <memory>
 
 namespace Output {
 
@@ -22,16 +23,15 @@ namespace Output {
             wlr_scene_buffer* scene_buffer;
     };
 
-    class Monitor {
-        public:
-            Monitor(wlr_output* output);
-            Extends getExtends(bool full);
-            void frameNotify();
-            void updateState(const wlr_output_state* state);
+    //logical representation of one virtual Display (can be assigned to multiple monitors)
+    class Display {
+        public: 
+            Display(Extends ext);
         private:
             Extends extends;
-            wlr_output* output;
     };
 
-    extern std::list<Monitor*> monitors;
+    typedef std::weak_ptr<Display> DisplayPtr;
+
+    extern std::list<DisplayPtr> displays;
 }

@@ -21,12 +21,25 @@ void draw(cairo_t* cr) {
 
 namespace Output {
 
+	std::list<DisplayPtr> displays;
+
 	//MONITOR BEGIN
 	wl_listener new_output_listener;
 	wlr_scene_output_layout* scene_layout;
 	wlr_output_layout* output_layout;
     wlr_scene* scene;
-	std::list<Monitor*> monitors;
+
+	class Monitor { //represents a Physical Monitor / output
+        public:
+            Monitor(wlr_output* output);
+            Extends getExtends(bool full);
+            void frameNotify();
+            void updateState(const wlr_output_state* state);
+        private:
+            Extends extends;
+            wlr_output* output;
+			std::shared_ptr<Display> display;
+    };
 
 	struct MonitorListeners {
 		Monitor* monitor;
@@ -36,6 +49,11 @@ namespace Output {
 		wl_listener destroy;
 	};
 
+	void runDisplayGarbageCollection() {
+		for(auto it = displays.begin(); it != displays.end(); it++) {
+			if(it->expired()) displays.erase(it);
+		}
+	}
 
 	Monitor::Monitor(wlr_output* output) {
 		this->output = output;
@@ -60,6 +78,9 @@ namespace Output {
 		extends.height = output->height;
 		extends.x = scene_output->x;
 		extends.y = scene_output->y;
+
+		display = std::make_shared<Display>(extends);
+		displays.push_back(display);
 
 		//layout_init(output->extends);
 		Layout::setScreenExtends(extends);
@@ -94,7 +115,6 @@ namespace Output {
 
 		MonitorListeners* listeners = new MonitorListeners();
 		listeners->monitor = new Monitor(wlr_output);
-		monitors.push_back(listeners->monitor);
 
 		//Listeners
 		listeners->frame.notify = [](struct wl_listener *listener, void *data){
@@ -114,12 +134,10 @@ namespace Output {
 			wl_list_remove(&listeners->request_state.link);
 			wl_list_remove(&listeners->destroy.link);
 
-			auto it = std::find(monitors.begin(), monitors.end(), listeners->monitor);
-			assert(it != monitors.end());
-			monitors.erase(it);
-
 			delete listeners->monitor;
 			delete listeners;
+
+			runDisplayGarbageCollection();
 		};
 
 		wl_signal_add(&wlr_output->events.frame, &listeners->frame);
@@ -143,6 +161,17 @@ namespace Output {
     }
 
 	//MONITOR END
+
+
+
+
+
+	//DISPALY
+	Display::Display(Extends ext) : extends(ext) {
+		
+	}
+
+	//DISPLAY END
 
 
 
