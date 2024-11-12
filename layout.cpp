@@ -1,41 +1,58 @@
 #include "layout.hpp"
 #include "input.hpp"
+#include "output.hpp"
 #include <list>
 #include <algorithm>
 #include <cassert>
 
 namespace Layout {
 
-    wlr_box screen_ext = {0,0,0,0};
-    std::list<Surface::Toplevel*> surfaces;
-    Surface::Toplevel* focused_toplevel;
+    struct Linear : public Base {
+        using Base::Base;
 
-    void updateLayout() {
-        debug("UPDATE LAYOUT");
-        const uint n = surfaces.size();
-        if(n == 0) return;
-        const uint h = screen_ext.width / n;
-        auto i = surfaces.begin();
-        wlr_box ext = screen_ext;
-        ext.width = screen_ext.width - (n-1)*h;
-        (*i)->setExtends(ext);
-        ext.x += screen_ext.width - (n-1)*h;
-        i++;
-        while(i != surfaces.end()) {
+        std::list<Surface::Toplevel*> surfaces;
+
+        void updateLayout() override {
+            const uint n = surfaces.size();
+            if(n == 0) return;
+            const uint h = extends.width / n;
+            auto i = surfaces.begin();
+            wlr_box ext = extends;
+            ext.width = extends.width - (n-1)*h;
             (*i)->setExtends(ext);
-            ext.x += h;
+            ext.x += extends.width - (n-1)*h;
             i++;
+            while(i != surfaces.end()) {
+                (*i)->setExtends(ext);
+                ext.x += h;
+                i++;
+            }
+        };
+
+        void addSurface(Surface::Toplevel* surface) override {
+            surfaces.push_back(surface);
+            updateLayout();
+        };
+
+        Surface::Toplevel* removeSurface(Surface::Toplevel* surface) override {
+            auto it = std::find(surfaces.begin(), surfaces.end(), surface);
+            assert(it != surfaces.end());
+
+            it = surfaces.erase(it);
+            updateLayout();
+
+            if(surfaces.begin() == surfaces.end()) return nullptr;
+            if(it != surfaces.end()) return *it;
+            else return *surfaces.begin();
+        };
+
+        void forEach(std::function<void(Surface::Toplevel* toplevel)> func) {
+            for(auto surface : surfaces) func(surface);
         }
+    };
 
-        debug("UPDATE LAYOUT end");
-    }
-
-    void setScreenExtends(wlr_box extends) {
-        extends.y += 30;
-        extends.height -= 30;
-        screen_ext = extends;
-        updateLayout();
-    }
+    Surface::Toplevel* focused_toplevel;
+    Output::Display* focused_display;
 
     void inline setFocus(Surface::Toplevel* surface) {
         if(!surface) return;
@@ -48,42 +65,53 @@ namespace Layout {
         surface->setFocus(true);
     }
 
+    inline Output::Display* getFocusedDisplay() {
+        if(!focused_display) focused_display = *Output::displays.begin();
+        assert(focused_display);
+        return focused_display;
+    }
+
     void addSurface(Surface::Toplevel* surface) {
         debug("ADD SURFACE");
-        surfaces.push_back(surface);
-        updateLayout();
+        getFocusedDisplay()->layout->addSurface(surface);
         setFocus(surface);
         debug("ADD SURFACE end");
     }
 
     void removeSurface(Surface::Toplevel* surface) {
-        auto it = std::find(surfaces.begin(), surfaces.end(), surface);
-        assert(it != surfaces.end());
-
-        it = surfaces.erase(it);
-        updateLayout();
-
+        auto next = getFocusedDisplay()->layout->removeSurface(surface);
         if(surface == focused_toplevel) {
-            if(surfaces.begin() == surfaces.end()) {
+            if(!next) {
                 focused_toplevel = nullptr;
                 return;
             }
-
-            if(it != surfaces.end()) focused_toplevel = *it;
-            else focused_toplevel = *surfaces.begin();
-            
+            focused_toplevel = next;
             focused_toplevel->setFocus(true);
         }
     }
 
-    Surface::Toplevel* getSurfaceAtPosition(const int x, const int y) {
-        for(auto i = surfaces.begin(); i != surfaces.end(); i++) if((*i)->contains(x,y)) return *i;
-        return NULL;
-    }
-
     void handleCursorMovement(const double x, const double y) {
-        auto surface = getSurfaceAtPosition(x,y);
+        Surface::Toplevel* surface = nullptr;
+        dynamic_cast<Linear*>(getFocusedDisplay()->layout.get())->forEach([&surface, x, y](Surface::Toplevel* s){
+            if(s->contains(x,y)) surface = s;
+        });
+        //if(!surface) return;
         setFocus(surface);
         Input::setCursorFocus(surface);
+    }
+
+    Base::Base(Extends ext) : extends(ext) {}
+
+    void Base::updateExtends(Extends ext) {
+        extends = ext;
+        updateLayout();
+    }
+
+    void removeDisplay(Output::Display* display) {
+        if(focused_display == display) focused_display = nullptr;
+    }
+
+    std::unique_ptr<Base> generateNewLayout(Extends ext) {
+        return std::make_unique<Linear>(ext);
     }
 }

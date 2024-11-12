@@ -9,7 +9,7 @@ LIBS=-L/usr/lib \
 	 $(shell pkg-config --cflags --libs xkbcommon) \
 	 $(shell pkg-config --cflags --libs cairo)
 
-FLAGS=$(CFLAGS) -Wall -I/usr/include/pixman-1 -I. -I/usr/include/wlroots-0.18 -DWLR_USE_UNSTABLE
+FLAGS=$(CFLAGS) -g -O0 -Wall -I/usr/include/pixman-1 -I. -I/usr/include/wlroots-0.18 -DWLR_USE_UNSTABLE
 
 GREEN=\033[1;32m
 RED=\033[1;31m

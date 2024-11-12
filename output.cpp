@@ -21,7 +21,7 @@ void draw(cairo_t* cr) {
 
 namespace Output {
 
-	std::list<DisplayPtr> displays;
+	std::list<Display*> displays;
 
 	//MONITOR BEGIN
 	wl_listener new_output_listener;
@@ -32,13 +32,17 @@ namespace Output {
 	class Monitor { //represents a Physical Monitor / output
         public:
             Monitor(wlr_output* output);
-            Extends getExtends(bool full);
+			~Monitor() {
+				assert(display->monitorCount != 0);
+				display->monitorCount--;
+				if(display->monitorCount == 0) delete display;
+			}
             void frameNotify();
             void updateState(const wlr_output_state* state);
         private:
             Extends extends;
             wlr_output* output;
-			std::shared_ptr<Display> display;
+			Display* display;
     };
 
 	struct MonitorListeners {
@@ -48,12 +52,6 @@ namespace Output {
 		wl_listener request_state;
 		wl_listener destroy;
 	};
-
-	void runDisplayGarbageCollection() {
-		for(auto it = displays.begin(); it != displays.end(); it++) {
-			if(it->expired()) displays.erase(it);
-		}
-	}
 
 	Monitor::Monitor(wlr_output* output) {
 		this->output = output;
@@ -79,11 +77,8 @@ namespace Output {
 		extends.x = scene_output->x;
 		extends.y = scene_output->y;
 
-		display = std::make_shared<Display>(extends);
+		display = new Display(extends);
 		displays.push_back(display);
-
-		//layout_init(output->extends);
-		Layout::setScreenExtends(extends);
 
 		//TEST
 		Buffer* buffer = new Buffer();
@@ -107,7 +102,7 @@ namespace Output {
 		extends.width = output->width;
 		extends.height = output->height;
 
-		Layout::setScreenExtends(extends);
+		display->updateExtends(extends);
 	}
 
 	void backend_new_output_notify(struct wl_listener *listener, void *data) {
@@ -136,8 +131,6 @@ namespace Output {
 
 			delete listeners->monitor;
 			delete listeners;
-
-			runDisplayGarbageCollection();
 		};
 
 		wl_signal_add(&wlr_output->events.frame, &listeners->frame);
@@ -168,7 +161,25 @@ namespace Output {
 
 	//DISPALY
 	Display::Display(Extends ext) : extends(ext) {
-		
+		Extends layout_ext = ext;
+		layout_ext.height -= 30;
+		layout_ext.y += 30;
+		layout = Layout::generateNewLayout(layout_ext);
+		monitorCount = 1;
+	}
+
+	Display::~Display() {
+		auto it = std::find(displays.begin(), displays.end(), this);
+		assert(it != displays.end());
+		displays.erase(it);
+		Layout::removeDisplay(this);
+	}
+
+	void Display::updateExtends(Extends ext) {
+		Extends layout_ext = ext;
+		layout_ext.height -= 30;
+		layout_ext.y += 30;
+		layout->updateExtends(layout_ext);
 	}
 
 	//DISPLAY END

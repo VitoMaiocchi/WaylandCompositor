@@ -6,6 +6,10 @@
 #include <list>
 #include <memory>
 
+namespace Layout {
+    class Base;
+}
+
 namespace Output {
 
     extern wlr_output_layout* output_layout;
@@ -27,11 +31,14 @@ namespace Output {
     class Display {
         public: 
             Display(Extends ext);
+            ~Display();
+            std::unique_ptr<Layout::Base> layout;
+            void updateExtends(Extends ext);
+
+            uint monitorCount = 0;
         private:
             Extends extends;
     };
 
-    typedef std::weak_ptr<Display> DisplayPtr;
-
-    extern std::list<DisplayPtr> displays;
+    extern std::list<Display*> displays;
 }
