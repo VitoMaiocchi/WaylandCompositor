@@ -40,5 +40,7 @@ namespace Output {
             Extends extends;
     };
 
-    extern std::list<Display*> displays;
+    typedef OptionalPointer<Display> DisplayPtr;
+
+    extern std::list<DisplayPtr> displays;
 }

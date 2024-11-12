@@ -10,9 +10,7 @@ namespace Layout {
     //adds surface to layout
     void addSurface(Surface::Toplevel* surface);
     //removes surface from layout.
-    void removeSurface(Surface::Toplevel* surface); 
-
-    void removeDisplay(Output::Display* display);
+    void removeSurface(Surface::Toplevel* surface);
 
     void handleCursorMovement(const double x, const double y);
 
@@ -20,6 +18,7 @@ namespace Layout {
     class Base {
         public:
             Base(Extends ext);
+            virtual ~Base() = default;
             void updateExtends(Extends ext);
             virtual void addSurface(Surface::Toplevel* surface) = 0;
             virtual Surface::Toplevel* removeSurface(Surface::Toplevel* surface) = 0;

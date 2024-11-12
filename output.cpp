@@ -21,7 +21,7 @@ void draw(cairo_t* cr) {
 
 namespace Output {
 
-	std::list<Display*> displays;
+	std::list<DisplayPtr> displays;
 
 	//MONITOR BEGIN
 	wl_listener new_output_listener;
@@ -32,17 +32,12 @@ namespace Output {
 	class Monitor { //represents a Physical Monitor / output
         public:
             Monitor(wlr_output* output);
-			~Monitor() {
-				assert(display->monitorCount != 0);
-				display->monitorCount--;
-				if(display->monitorCount == 0) delete display;
-			}
             void frameNotify();
             void updateState(const wlr_output_state* state);
         private:
             Extends extends;
             wlr_output* output;
-			Display* display;
+			DisplayPtr display = nullptr;
     };
 
 	struct MonitorListeners {
@@ -169,13 +164,15 @@ namespace Output {
 	}
 
 	Display::~Display() {
-		auto it = std::find(displays.begin(), displays.end(), this);
+		auto it = std::find_if(displays.begin(), displays.end(), [this](DisplayPtr ptr){
+			return ptr.get() == this; 
+		});
 		assert(it != displays.end());
 		displays.erase(it);
-		Layout::removeDisplay(this);
 	}
 
 	void Display::updateExtends(Extends ext) {
+		extends = ext;
 		Extends layout_ext = ext;
 		layout_ext.height -= 30;
 		layout_ext.y += 30;

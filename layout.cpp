@@ -52,7 +52,7 @@ namespace Layout {
     };
 
     Surface::Toplevel* focused_toplevel;
-    Output::Display* focused_display;
+    Output::DisplayPtr focused_display = nullptr;
 
     void inline setFocus(Surface::Toplevel* surface) {
         if(!surface) return;
@@ -66,9 +66,10 @@ namespace Layout {
     }
 
     inline Output::Display* getFocusedDisplay() {
-        if(!focused_display) focused_display = *Output::displays.begin();
-        assert(focused_display);
-        return focused_display;
+        assert(Output::displays.begin() != Output::displays.end());
+        if(!focused_display.get()) focused_display = *Output::displays.begin();
+        assert(focused_display.exists()); //wenns keis display het
+        return focused_display.get();
     }
 
     void addSurface(Surface::Toplevel* surface) {
@@ -105,10 +106,6 @@ namespace Layout {
     void Base::updateExtends(Extends ext) {
         extends = ext;
         updateLayout();
-    }
-
-    void removeDisplay(Output::Display* display) {
-        if(focused_display == display) focused_display = nullptr;
     }
 
     std::unique_ptr<Base> generateNewLayout(Extends ext) {
