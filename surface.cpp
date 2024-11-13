@@ -10,7 +10,7 @@
 
 namespace Surface {
 	struct wlr_xdg_shell *xdg_shell;
-	struct wl_listener new_xdg_surface;
+	//struct wl_listener new_xdg_surface;
 	struct wl_listener new_xdg_toplevel;
 
 	wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
@@ -190,12 +190,117 @@ namespace Surface {
 		wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 	}
 
+	//XWAYLAND ULTRA (no ultra scheisse)
+	wlr_xwayland* xwayland;
+	wl_listener new_xwayland_surface;
+	wl_listener xwayland_ready_listener;
+
+	struct xwayland_surface_listeners {
+		wlr_xwayland_surface* surface;
+		wl_listener map;
+		wl_listener associate;
+	};
+
+	void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
+		debug("NEW XWAYLAND SURFACE NOTIFY");
+		struct wlr_xwayland_surface* surface = (wlr_xwayland_surface*) data;
+		auto listeners = new xwayland_surface_listeners;
+		listeners->surface = surface;
+
+		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
+			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
+			debug("YAY IM ASSOCIATED I AM THE XWAYLAND WINDOW");
+
+			wlr_scene_tree* parent = wlr_scene_tree_create(&Output::scene->tree);
+				assert(parent);
+				assert(listeners);
+				assert(listeners->surface);
+				assert(listeners->surface->surface);
+			wlr_scene_subsurface_tree_create(parent, listeners->surface->surface);
+			wlr_xwayland_surface_configure(listeners->surface, 0, 0, 800, 600);
+
+			//das passiert irgendwie nöd
+			listeners->map.notify = [](struct wl_listener* listener, void* data) {
+				xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
+				//listeners->surface
+				//wlr_xwayland_surface_configure()
+				debug("GOOGGOO GAGA I WANT TO BE MAPPED");
+				wlr_scene_tree* parent = wlr_scene_tree_create(&Output::scene->tree);
+				debug("GOOGGOO GAGA I WANT TO BE MAPPED 1");
+				assert(parent);
+				assert(listeners);
+				assert(listeners->surface);
+				assert(listeners->surface->surface);
+				wlr_scene_subsurface_tree_create(parent, listeners->surface->surface);
+				debug("GOOGGOO GAGA I WANT TO BE MAPPED 3");
+				//wlr_xwayland_surface_configure(listeners->surface, 0, 0, 800, 600);
+				//debug("GOOGGOO GAGA I WANT TO BE MAPPED 4");
+			};
+			wl_signal_add(&listeners->surface->events.map_request, &listeners->map);
+
+		};
+		wl_signal_add(&surface->events.associate, &listeners->associate);
+	}
+
+	//kein plan was das macht
+	enum { NetWMWindowTypeDialog, NetWMWindowTypeSplash, NetWMWindowTypeToolbar,
+	NetWMWindowTypeUtility, NetLast }; /* EWMH atoms */
+	static xcb_atom_t netatom[NetLast];
+	xcb_atom_t getatom(xcb_connection_t *xc, const char *name) {
+		xcb_atom_t atom = 0;
+		xcb_intern_atom_reply_t *reply;
+		xcb_intern_atom_cookie_t cookie = xcb_intern_atom(xc, 0, strlen(name), name);
+		if ((reply = xcb_intern_atom_reply(xc, cookie, NULL)))
+			atom = reply->atom;
+		free(reply);
+
+		return atom;
+	}
+
+	void xwayland_ready(struct wl_listener* listener, void* data) {
+		debug("X WAYLAND READY");
+		struct wlr_xcursor *xcursor;
+		xcb_connection_t *xc = xcb_connect(xwayland->display_name, NULL);
+		int err = xcb_connection_has_error(xc);
+		if (err) {
+			fprintf(stderr, "xcb_connect to X server failed with code %d\n. Continuing with degraded functionality.\n", err);
+			return;
+		}
+
+		/* Collect atoms we are interested in. If getatom returns 0, we will
+		* not detect that window type. */
+		netatom[NetWMWindowTypeDialog] = getatom(xc, "_NET_WM_WINDOW_TYPE_DIALOG");
+		netatom[NetWMWindowTypeSplash] = getatom(xc, "_NET_WM_WINDOW_TYPE_SPLASH");
+		netatom[NetWMWindowTypeToolbar] = getatom(xc, "_NET_WM_WINDOW_TYPE_TOOLBAR");
+		netatom[NetWMWindowTypeUtility] = getatom(xc, "_NET_WM_WINDOW_TYPE_UTILITY");
+
+		/* assign the one and only seat */
+		wlr_xwayland_set_seat(xwayland, Input::seat);
+
+		/* Set the default XWayland cursor to match the rest of dwl. */
+		if ((xcursor = wlr_xcursor_manager_get_xcursor(Input::cursor_mgr, "default", 1)))
+			wlr_xwayland_set_cursor(xwayland,
+					xcursor->images[0]->buffer, xcursor->images[0]->width * 4,
+					xcursor->images[0]->width, xcursor->images[0]->height,
+					xcursor->images[0]->hotspot_x, xcursor->images[0]->hotspot_y);
+
+		xcb_disconnect(xc);
+	}
+
 	void setup() {
 		debug("SURFACE SETUP");
+
 		xdg_shell = wlr_xdg_shell_create(Server::display, 3);
-		
 		new_xdg_toplevel.notify = new_xdg_toplevel_notify;
 		wl_signal_add(&xdg_shell->events.new_toplevel, &new_xdg_toplevel);	
+
+		xwayland = wlr_xwayland_create(Server::display, Server::compositor, false);
+		
+		new_xwayland_surface.notify = new_xwayland_surface_notify;
+		wl_signal_add(&xwayland->events.new_surface, &new_xwayland_surface);
+		xwayland_ready_listener.notify = xwayland_ready;
+		wl_signal_add(&xwayland->events.ready, &xwayland_ready_listener);
+		setenv("DISPLAY", xwayland->display_name, 1);
 
 			//requesting serverside decorations of clients
 		wlr_server_decoration_manager_set_default_mode(

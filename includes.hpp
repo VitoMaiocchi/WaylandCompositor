@@ -67,6 +67,9 @@ extern "C" {
 
     #include <wlr/interfaces/wlr_buffer.h>
 
+    #include <wlr/xwayland.h>
+    #include <wlr/xwayland/shell.h>
+
     #include <cairo/cairo.h>
     #include <cassert>
     /*

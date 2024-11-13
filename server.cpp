@@ -14,6 +14,7 @@ namespace Server {
 	wlr_backend* backend;
     wlr_renderer* renderer;
 	wlr_allocator* allocator;
+    wlr_compositor* compositor;
 
     bool setup() {
         wlr_log_init(WLR_DEBUG, NULL);
@@ -29,7 +30,8 @@ namespace Server {
         allocator = wlr_allocator_autocreate(backend, renderer);
         ASSERT_NOTNULL(allocator, "failed to create wlr_allocator");
 
-        wlr_compositor_create(display, 5, renderer);
+        compositor = wlr_compositor_create(display, 5, renderer);
+        ASSERT_NOTNULL(compositor, "failed to create wlr_compositor");
         wlr_subcompositor_create(display);
         wlr_data_device_manager_create(display);
 

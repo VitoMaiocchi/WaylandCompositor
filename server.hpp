@@ -8,6 +8,7 @@ namespace Server {
 	extern wlr_backend* backend;
     extern wlr_renderer* renderer;
 	extern wlr_allocator* allocator;
+    extern wlr_compositor* compositor;
 
     bool setup();
 }
