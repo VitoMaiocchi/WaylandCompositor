@@ -190,44 +190,97 @@ namespace Surface {
 		wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 	}
 
-	
+	//XWAYLAND
+	class XwaylandToplevel : public Toplevel {
+		wlr_xwayland_surface* xwayland_surface;
+
+        public:
+        XwaylandToplevel(wlr_xwayland_surface* xwayland_surface) {
+			this->xwayland_surface = xwayland_surface;
+			root_node = wlr_scene_tree_create(&Output::scene->tree);
+		}
+
+		void associate() {
+			surface_node = wlr_scene_subsurface_tree_create(root_node, xwayland_surface->surface);
+			map_notify();
+		}
+
+        ~XwaylandToplevel() {
+			wlr_scene_node_destroy(&root_node->node);
+		}
+
+        private:
+        void setSurfaceSize(uint width, uint height) {
+			wlr_xwayland_surface_configure(xwayland_surface, 0,0, width, height);
+		}
+
+        void setActivated(bool activated) {
+			wlr_xwayland_surface_activate(xwayland_surface, activated);
+		}
+
+        wlr_surface* getSurface() {
+			return xwayland_surface->surface;
+		}
+
+    };
+
 	wlr_xwayland* xwayland;
 	wl_listener new_xwayland_surface;
 	wl_listener xwayland_ready_listener;
 
 	struct xwayland_surface_listeners {
-		wlr_xwayland_surface* surface;
+		XwaylandToplevel* surface;
+		bool waiting_for_map = false;
+		bool associated = false;
 		wl_listener map;
 		wl_listener associate;
+		wl_listener disassociate;
+		wl_listener destroy;
 	};
 
 	void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
 		debug("NEW XWAYLAND SURFACE NOTIFY");
 		struct wlr_xwayland_surface* surface = (wlr_xwayland_surface*) data;
 		auto listeners = new xwayland_surface_listeners;
-		listeners->surface = surface;
+		listeners->surface = new XwaylandToplevel(surface);
 
 		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
-			wlr_log(WLR_DEBUG, "surface %p has been associated", listeners->surface);
-			debug("YAY IM ASSOCIATED I AM THE XWAYLAND WINDOW");
-
-			wlr_scene_tree* parent = wlr_scene_tree_create(&Output::scene->tree);
-				assert(parent);
-				assert(listeners);
-				assert(listeners->surface);
-				assert(listeners->surface->surface);
-			wlr_scene_subsurface_tree_create(parent, listeners->surface->surface);
-			wlr_xwayland_surface_configure(listeners->surface, 0, 0, 800, 600);
+			wlr_log(WLR_DEBUG, "surface %p is now associated", listeners->surface);
+			listeners->associated = true;
+			if(listeners->waiting_for_map) listeners->surface->associate();
 		};
 		wl_signal_add(&surface->events.associate, &listeners->associate);
 
-		//das passiert irgendwie nöd
 		listeners->map.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
 			wlr_log(WLR_DEBUG, "surface %p wants to be mapped", listeners->surface);
+			listeners->waiting_for_map = true;
+			if(listeners->associated) listeners->surface->associate();
 		};
-		wl_signal_add(&listeners->surface->events.map_request, &listeners->map);
+		wl_signal_add(&surface->events.map_request, &listeners->map);
+
+		listeners->disassociate.notify = [](struct wl_listener* listener, void* data) {
+			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, disassociate);
+			wlr_log(WLR_DEBUG, "surface %p disassociated", listeners->surface);
+			listeners->surface->unmap_notify();
+		};
+		wl_signal_add(&surface->events.dissociate, &listeners->disassociate);
+
+		listeners->destroy.notify = [](struct wl_listener* listener, void* data) {
+			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, destroy);
+			wlr_log(WLR_DEBUG, "surface %p destroyed", listeners->surface);
+
+			delete listeners->surface;
+
+			wl_list_remove(&listeners->map.link);
+			wl_list_remove(&listeners->associate.link);
+			wl_list_remove(&listeners->disassociate.link);
+			wl_list_remove(&listeners->destroy.link);
+
+			delete listeners;
+		};
+		wl_signal_add(&surface->events.destroy, &listeners->destroy);
 	}
 
 	//kein plan was das macht
