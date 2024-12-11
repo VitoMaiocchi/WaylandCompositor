@@ -190,7 +190,7 @@ namespace Surface {
 		wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 	}
 
-	//XWAYLAND ULTRA (no ultra scheisse)
+	
 	wlr_xwayland* xwayland;
 	wl_listener new_xwayland_surface;
 	wl_listener xwayland_ready_listener;
@@ -209,6 +209,7 @@ namespace Surface {
 
 		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
+			wlr_log(WLR_DEBUG, "surface %p has been associated", listeners->surface);
 			debug("YAY IM ASSOCIATED I AM THE XWAYLAND WINDOW");
 
 			wlr_scene_tree* parent = wlr_scene_tree_create(&Output::scene->tree);
@@ -218,28 +219,15 @@ namespace Surface {
 				assert(listeners->surface->surface);
 			wlr_scene_subsurface_tree_create(parent, listeners->surface->surface);
 			wlr_xwayland_surface_configure(listeners->surface, 0, 0, 800, 600);
-
-			//das passiert irgendwie nöd
-			listeners->map.notify = [](struct wl_listener* listener, void* data) {
-				xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
-				//listeners->surface
-				//wlr_xwayland_surface_configure()
-				debug("GOOGGOO GAGA I WANT TO BE MAPPED");
-				wlr_scene_tree* parent = wlr_scene_tree_create(&Output::scene->tree);
-				debug("GOOGGOO GAGA I WANT TO BE MAPPED 1");
-				assert(parent);
-				assert(listeners);
-				assert(listeners->surface);
-				assert(listeners->surface->surface);
-				wlr_scene_subsurface_tree_create(parent, listeners->surface->surface);
-				debug("GOOGGOO GAGA I WANT TO BE MAPPED 3");
-				//wlr_xwayland_surface_configure(listeners->surface, 0, 0, 800, 600);
-				//debug("GOOGGOO GAGA I WANT TO BE MAPPED 4");
-			};
-			wl_signal_add(&listeners->surface->events.map_request, &listeners->map);
-
 		};
 		wl_signal_add(&surface->events.associate, &listeners->associate);
+
+		//das passiert irgendwie nöd
+		listeners->map.notify = [](struct wl_listener* listener, void* data) {
+			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
+			wlr_log(WLR_DEBUG, "surface %p wants to be mapped", listeners->surface);
+		};
+		wl_signal_add(&listeners->surface->events.map_request, &listeners->map);
 	}
 
 	//kein plan was das macht
