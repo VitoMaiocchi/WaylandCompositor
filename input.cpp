@@ -83,6 +83,7 @@ namespace Input {
         wlr_seat_pointer_notify_button(seat, event->time_msec, event->button, event->state);
     }
 
+    //SCROLL EVENT
     void cursor_axis_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_axis_event *event = (wlr_pointer_axis_event*) data;
         wlr_seat_pointer_notify_axis(seat, event->time_msec, event->orientation, 
@@ -260,6 +261,7 @@ namespace Input {
         wl_signal_add(&cursor->events.button, &cursor_button);
         wl_signal_add(&cursor->events.axis, &cursor_axis);
         wl_signal_add(&cursor->events.frame, &cursor_frame);
+
 
         wl_list_init(&keyboards);
         new_input.notify = backend_new_input_notify;

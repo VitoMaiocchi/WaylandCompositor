@@ -9,13 +9,7 @@
 #include <cassert>
 
 namespace Surface {
-	struct wlr_xdg_shell *xdg_shell;
-	//struct wl_listener new_xdg_surface;
-	struct wl_listener new_xdg_toplevel;
-
-	wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
-	wl_listener xdg_decoration_listener;
-
+	//BASE CLASS
 	bool Base::contains(int x, int y) {
 		if(extends.x > x) return false;
 		if(extends.x + extends.width < x) return false;
@@ -25,22 +19,59 @@ namespace Surface {
 		return true;
 	}
 
+	void Base::setExtends(wlr_box extends) {
+		bool resize = this->extends.width != extends.width || this->extends.height != extends.height;
+		this->extends = extends;
+		extendsUpdateNotify(resize);
+	}
+
+	//TOPLEVEL
 	Toplevel::Toplevel() {
 		for(uint i = 0; i < 4; i++) border[i] = NULL;
 		extends = {0,0,0,0};
 	}
 	
-	void Toplevel::setExtends(struct wlr_box extends) {
-		struct wlr_box oldext = this->extends;
-		this->extends = extends;
+	void Toplevel::setFocus(bool focus) {
+		if(!focus) debug("UNFOCUS");
+		if(focus) debug("FOCUS");
+		setActivated(focus);
+		if(!focus) {
+			for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_inactive);
+			return;
+		}
 
-		//TODO: DA NUR WENN ES GMAPPED UND VISIBLE ISCH WITERMACHE
-		//ODER EVTL SÖTT NUR CALLED WERDE WENN VISIBLE KA
-		//uf jede fall wird so vill errors ge
-		//das isch jetz au scho wider outdated aber ich lan de kommentar zur sicherheit no da
+		for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_active);
 
-		//TODO: REMOVE CODE DUPLICATION
+		Input::setKeyboardFocus(this);
+	}
 
+	void Toplevel::setVisibility(bool visible) {
+		this->visible = visible;
+		//TODO
+	}
+
+	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) {
+		return {x - (extends.x + BORDERWIDTH), y - (extends.y + BORDERWIDTH)};
+	}
+
+	void Toplevel::mapNotify(bool mapped) {
+		if(mapped) {
+			Layout::addSurface(this);
+			return;
+		}
+
+		//remove surface from layout
+		Layout::removeSurface(this);
+
+		//destroy window decorations
+		for(unsigned i = 0; i < 4; i++) {
+			assert(border[i]);
+			wlr_scene_node_destroy(&border[i]->node);
+			border[i] = NULL;
+		}
+	}
+
+	void Toplevel::extendsUpdateNotify(bool resize) {
 		if(!border[0]) {
 			//CREATE WINDOW DECORATION
 			wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
@@ -61,8 +92,6 @@ namespace Surface {
 
 		//UPDATE WINDOW DECORATION
 		wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
-
-		bool resize = oldext.width != extends.width || oldext.height != extends.height;
 		if(!resize) return; //the rest only involves resize
 
 		setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
@@ -76,73 +105,47 @@ namespace Surface {
 		wlr_scene_rect_set_size(border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
 	}
 
-	void Toplevel::setFocus(bool focus) {
-		if(!focus) debug("UNFOCUS");
-		if(focus) debug("FOCUS");
-		setActivated(focus);
-		if(!focus) {
-			for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_inactive);
-			return;
+
+
+    class XdgToplevel : public Toplevel {
+        struct wlr_xdg_toplevel* xdg_toplevel;
+
+        void setSurfaceSize(uint width, uint height) {
+			wlr_xdg_toplevel_set_size(xdg_toplevel, width, height);
 		}
 
-		for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_active);
-
-		Input::setKeyboardFocus(this);
-	}
-
-	void Toplevel::map_notify() {
-		Layout::addSurface(this);
-	}
-
-	void Toplevel::unmap_notify() {
-		debug("UMAP NOTIFY");
-
-		//remove surface from layout
-		Layout::removeSurface(this);
-
-		//destroy window decorations
-		for(unsigned i = 0; i < 4; i++) {
-			assert(border[i]);
-			wlr_scene_node_destroy(&border[i]->node);
-			border[i] = NULL;
+        void setActivated(bool activated) {
+			wlr_xdg_toplevel_set_activated(xdg_toplevel, activated);
 		}
-	}
 
-	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) {
-		return {x - (extends.x + BORDERWIDTH), y - (extends.y + BORDERWIDTH)};
-	}
+        wlr_surface* getSurface() {
+			return xdg_toplevel->base->surface;
+		}
 
-	wlr_surface* XdgToplevel::getSurface() {
-		return xdg_toplevel->base->surface;
-	}
+        public:
+        XdgToplevel(wlr_xdg_toplevel* xdg_toplevel) {
+			debug("TOPLEVEL SURFACE");
+			this->xdg_toplevel = xdg_toplevel;
+			root_node = wlr_scene_tree_create(&Output::scene->tree);
+			surface_node = wlr_scene_xdg_surface_create(root_node, xdg_toplevel->base);
+		}
 
-	void XdgToplevel::setActivated(bool activated) {
-		wlr_xdg_toplevel_set_activated(xdg_toplevel, activated);
-	}
+        ~XdgToplevel() {
+			wlr_scene_node_destroy(&root_node->node);
+		}
 
-	void XdgToplevel::setSurfaceSize(uint width, uint height) {
-		wlr_xdg_toplevel_set_size(xdg_toplevel, width, height);
-	}
+		void map_event(bool map) {
+			mapNotify(map);
+		}
+    };
 
-	XdgToplevel::XdgToplevel(wlr_xdg_toplevel* xdg_toplevel) {
-		debug("TOPLEVEL SURFACE");
+	wlr_xdg_shell *xdg_shell;
+	wl_listener new_xdg_toplevel;
+	wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
+	wl_listener xdg_decoration_listener;
 
-		this->xdg_toplevel = xdg_toplevel;
-		root_node = wlr_scene_tree_create(&Output::scene->tree);
-		surface_node = wlr_scene_xdg_surface_create(root_node, xdg_toplevel->base);
-		//xdg_surface->data = surface_node;   //WEISS NÖD OB DAS MIT EM REDESIGN NÖTIG ISCH
-											//evtl isch gschider da XdgTopLevel ane mache
-
-	}
-
-	Toplevel::~Toplevel() {}
-
-	XdgToplevel::~XdgToplevel() {
-		wlr_scene_node_destroy(&root_node->node);
-	}
-
-	struct TopLevelListeners {
-		Toplevel* toplevel;
+	struct xdg_shell_surface_listeners {
+		XdgToplevel* surface;
 
 		struct wl_listener map_listener;
 		struct wl_listener unmap_listener;
@@ -152,26 +155,26 @@ namespace Surface {
 	void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
 		debug("NEW XDG TOPLEVEL NOTIFY");
 		wlr_xdg_toplevel* xdg_toplevel = (wlr_xdg_toplevel*) data;
-		TopLevelListeners* listeners = new TopLevelListeners();
-		listeners->toplevel = new XdgToplevel(xdg_toplevel);
+		xdg_shell_surface_listeners* listeners = new xdg_shell_surface_listeners();
+		listeners->surface = new XdgToplevel(xdg_toplevel);
 
 				//CONFIGURE LISTENERS
 		listeners->map_listener.notify = [](struct wl_listener* listener, void* data) {
 			debug("MAP SURFACE");
-			TopLevelListeners* listeners = wl_container_of(listener, listeners, map_listener);
-			listeners->toplevel->map_notify();
+			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, map_listener);
+			listeners->surface->map_event(true);
 		};
 
 		listeners->unmap_listener.notify = [](struct wl_listener* listener, void* data) {
 			debug("UMAP SURFACE");
-			TopLevelListeners* listeners = wl_container_of(listener, listeners, unmap_listener);
-			listeners->toplevel->unmap_notify();
+			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, unmap_listener);
+			listeners->surface->map_event(false);
 		};
 
 		listeners->destroy_listener.notify = [](struct wl_listener* listener, void* data) {
 			debug("DESTROY SURFACE");
-			TopLevelListeners* listeners = wl_container_of(listener, listeners, destroy_listener);
-			delete listeners->toplevel;
+			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, destroy_listener);
+			delete listeners->surface;
 
 			wl_list_remove(&listeners->map_listener.link);
 			wl_list_remove(&listeners->unmap_listener.link);
@@ -200,9 +203,21 @@ namespace Surface {
 			root_node = wlr_scene_tree_create(&Output::scene->tree);
 		}
 
-		void associate() {
-			surface_node = wlr_scene_subsurface_tree_create(root_node, xwayland_surface->surface);
-			map_notify();
+		void associate(bool associated) {
+			this->associated = associated;
+			if(associated && waiting_for_map) {
+				surface_node = wlr_scene_subsurface_tree_create(root_node, xwayland_surface->surface);
+				mapNotify(true);
+			}
+			if(!associated) mapNotify(false);
+		}
+
+		void map_request() {
+			waiting_for_map = true;
+			if(associated && waiting_for_map) {
+				surface_node = wlr_scene_subsurface_tree_create(root_node, xwayland_surface->surface);
+				mapNotify(true);
+			}
 		}
 
         ~XwaylandToplevel() {
@@ -210,6 +225,9 @@ namespace Surface {
 		}
 
         private:
+		bool waiting_for_map = false;
+		bool associated = false;
+
         void setSurfaceSize(uint width, uint height) {
 			wlr_xwayland_surface_configure(xwayland_surface, 0,0, width, height);
 		}
@@ -230,8 +248,6 @@ namespace Surface {
 
 	struct xwayland_surface_listeners {
 		XwaylandToplevel* surface;
-		bool waiting_for_map = false;
-		bool associated = false;
 		wl_listener map;
 		wl_listener associate;
 		wl_listener disassociate;
@@ -247,23 +263,21 @@ namespace Surface {
 		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
 			wlr_log(WLR_DEBUG, "surface %p is now associated", listeners->surface);
-			listeners->associated = true;
-			if(listeners->waiting_for_map) listeners->surface->associate();
+			listeners->surface->associate(true);
 		};
 		wl_signal_add(&surface->events.associate, &listeners->associate);
 
 		listeners->map.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
 			wlr_log(WLR_DEBUG, "surface %p wants to be mapped", listeners->surface);
-			listeners->waiting_for_map = true;
-			if(listeners->associated) listeners->surface->associate();
+			listeners->surface->map_request();
 		};
 		wl_signal_add(&surface->events.map_request, &listeners->map);
 
 		listeners->disassociate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, disassociate);
 			wlr_log(WLR_DEBUG, "surface %p disassociated", listeners->surface);
-			listeners->surface->unmap_notify();
+			listeners->surface->associate(false);
 		};
 		wl_signal_add(&surface->events.dissociate, &listeners->disassociate);
 
