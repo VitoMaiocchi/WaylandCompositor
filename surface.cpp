@@ -55,14 +55,18 @@ namespace Surface {
 		if(this->visible == visible) return;
 		this->visible = visible;
 		
-		if(visible) {
-			//create window decorations
-			assert(!border[0]); //make sure the borders are actually null
-			wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+		if(!visible) {
+			wlr_scene_node_set_enabled(&root_node->node, false);
+			return;
+		}
+		
+		wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+		setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
+		wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
 
-			setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
-			wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
-			
+		wlr_scene_node_set_enabled(&root_node->node, true);
+
+		if(!border[0]) { //create window decorations if they don't allready exist
 			auto color = focused? bordercolor_active : bordercolor_inactive;
 			border[0] = wlr_scene_rect_create(root_node, extends.width, BORDERWIDTH, color);
 			border[1] = wlr_scene_rect_create(root_node, extends.width, BORDERWIDTH, color);
@@ -72,19 +76,10 @@ namespace Surface {
 			wlr_scene_node_set_position(&border[1]->node, 0, extends.height-BORDERWIDTH);
 			wlr_scene_node_set_position(&border[2]->node, 0, BORDERWIDTH);
 			wlr_scene_node_set_position(&border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
-
-			wlr_scene_node_set_enabled(&root_node->node, true);
-			setActivated(focused);
-			if(focused) Input::setKeyboardFocus(this);
-		} else {
-			//destroy window decorations
-			wlr_scene_node_set_enabled(&root_node->node, false);
-			for(unsigned i = 0; i < 4; i++) {
-				assert(border[i]);
-				wlr_scene_node_destroy(&border[i]->node);
-				border[i] = NULL;
-			}
 		}
+
+		setActivated(focused);
+		if(focused) Input::setKeyboardFocus(this);
 	}
 
 	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) {
@@ -92,8 +87,18 @@ namespace Surface {
 	}
 
 	void Toplevel::mapNotify(bool mapped) {
-		if(mapped) Layout::addSurface(this);
-		else Layout::removeSurface(this);
+		if(mapped) {
+			Layout::addSurface(this);
+			return;
+		} 
+
+		Layout::removeSurface(this);
+
+		for(unsigned i = 0; i < 4; i++) {
+			assert(border[i]);
+			wlr_scene_node_destroy(&border[i]->node);
+			border[i] = NULL;
+		}
 	}
 
 	void Toplevel::extendsUpdateNotify(bool resize) {
