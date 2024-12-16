@@ -73,6 +73,7 @@ namespace Surface {
 			wlr_scene_node_set_position(&border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
 
 			setActivated(focused);
+			if(focused) Input::setKeyboardFocus(this);
 		} else {
 			//destroy window decorations
 			for(unsigned i = 0; i < 4; i++) {
