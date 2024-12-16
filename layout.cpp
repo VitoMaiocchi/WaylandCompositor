@@ -138,6 +138,14 @@ namespace Layout {
         }
     }
 
+    bool Display::contains(const double x, const double y) {
+        if(extends.x > x) return false;
+		if(extends.x + extends.width < x) return false;
+		if(extends.y > y) return false;
+		if(extends.y + extends.height < y) return false;
+		return true;
+    }
+
     void handleCursorMovement(const double x, const double y) {
         Surface::Toplevel* surface = nullptr;
         dynamic_cast<Linear*>(getFocusedDisplay()->node.get())->forEach([&surface, x, y](Surface::Toplevel* s){
@@ -146,5 +154,7 @@ namespace Layout {
 
         setFocus(surface);
         Input::setCursorFocus(surface);
+
+        for(Display* display : displays) if(display->contains(x,y)) focused_display = display;
     }
 }

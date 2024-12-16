@@ -19,9 +19,10 @@ namespace Layout {
         Display(Extends ext);
         ~Display();
         void updateExtends(Extends ext);
+        bool contains(const double x, const double y);
 
         std::unique_ptr<Base> node;
-        
+
         private:
         Extends extends;
     };

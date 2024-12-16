@@ -15,7 +15,6 @@ namespace Surface {
 		if(extends.x + extends.width < x) return false;
 		if(extends.y > y) return false;
 		if(extends.y + extends.height < y) return false;
-
 		return true;
 	}
 
