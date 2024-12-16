@@ -46,6 +46,7 @@ namespace Surface {
 
         bool visible; //visibility determined by layout
         bool maximized;
+        bool focused;
 
         bool mapped;
         bool minimized;

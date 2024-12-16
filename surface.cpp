@@ -29,9 +29,15 @@ namespace Surface {
 	Toplevel::Toplevel() {
 		for(uint i = 0; i < 4; i++) border[i] = NULL;
 		extends = {0,0,0,0};
+		visible = false;
+		focused = false;
 	}
 	
 	void Toplevel::setFocus(bool focus) {
+		if(focus == focused) return;
+		focused = focus;
+		if(!visible) return;
+
 		if(!focus) debug("UNFOCUS");
 		if(focus) debug("FOCUS");
 		setActivated(focus);
@@ -46,8 +52,36 @@ namespace Surface {
 	}
 
 	void Toplevel::setVisibility(bool visible) {
+		if(this->visible == visible) return;
 		this->visible = visible;
-		//TODO
+		
+		if(visible) {
+			//create window decorations
+			assert(!border[0]); //make sure the borders are actually null
+			wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+
+			setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
+			wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
+			
+			auto color = focused? bordercolor_active : bordercolor_inactive;
+			border[0] = wlr_scene_rect_create(root_node, extends.width, BORDERWIDTH, color);
+			border[1] = wlr_scene_rect_create(root_node, extends.width, BORDERWIDTH, color);
+			border[2] = wlr_scene_rect_create(root_node, BORDERWIDTH, extends.height-2*BORDERWIDTH, color);
+			border[3] = wlr_scene_rect_create(root_node, BORDERWIDTH, extends.height-2*BORDERWIDTH, color);
+
+			wlr_scene_node_set_position(&border[1]->node, 0, extends.height-BORDERWIDTH);
+			wlr_scene_node_set_position(&border[2]->node, 0, BORDERWIDTH);
+			wlr_scene_node_set_position(&border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
+
+			setActivated(focused);
+		} else {
+			//destroy window decorations
+			for(unsigned i = 0; i < 4; i++) {
+				assert(border[i]);
+				wlr_scene_node_destroy(&border[i]->node);
+				border[i] = NULL;
+			}
+		}
 	}
 
 	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) {
@@ -57,38 +91,17 @@ namespace Surface {
 	void Toplevel::mapNotify(bool mapped) {
 		if(mapped) {
 			Layout::addSurface(this);
+			setVisibility(true);
 			return;
 		}
 
 		//remove surface from layout
 		Layout::removeSurface(this);
-
-		//destroy window decorations
-		for(unsigned i = 0; i < 4; i++) {
-			assert(border[i]);
-			wlr_scene_node_destroy(&border[i]->node);
-			border[i] = NULL;
-		}
+		setVisibility(false);
 	}
 
 	void Toplevel::extendsUpdateNotify(bool resize) {
-		if(!border[0]) {
-			//CREATE WINDOW DECORATION
-			wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
-
-			setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
-			wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
-			
-			border[0] = wlr_scene_rect_create(root_node, extends.width, BORDERWIDTH, bordercolor_inactive);
-			border[1] = wlr_scene_rect_create(root_node, extends.width, BORDERWIDTH, bordercolor_inactive);
-			border[2] = wlr_scene_rect_create(root_node, BORDERWIDTH, extends.height-2*BORDERWIDTH, bordercolor_inactive);
-			border[3] = wlr_scene_rect_create(root_node, BORDERWIDTH, extends.height-2*BORDERWIDTH, bordercolor_inactive);
-
-			wlr_scene_node_set_position(&border[1]->node, 0, extends.height-BORDERWIDTH);
-			wlr_scene_node_set_position(&border[2]->node, 0, BORDERWIDTH);
-			wlr_scene_node_set_position(&border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
-			return;
-		}
+		if(!visible) return;
 
 		//UPDATE WINDOW DECORATION
 		wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);

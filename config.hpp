@@ -1,5 +1,4 @@
-#ifndef VITOWM_CONFIG_H
-#define VITOWM_CONFIG_H
+#pragma once
 
 #define BORDERWIDTH 2
 
@@ -10,5 +9,3 @@
 
 const float bordercolor_inactive[] = COLOR(0x777777FF);
 const float bordercolor_active[] = COLOR(0xFF0000FF);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef VITOWM_LAYOUT_H
-#define VITOWM_LAYOUT_H
+#pragma once
 
 #include "includes.hpp"
 #include "surface.hpp"
@@ -30,5 +29,3 @@ namespace Layout {
 
     std::unique_ptr<Base> generateNewLayout(Extends ext);
 }
-
-#endif
