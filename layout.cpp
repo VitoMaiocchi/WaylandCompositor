@@ -143,12 +143,13 @@ Extends t_height(Extends ext) {
     return ext;
 }
 
-struct Fullscreen {
+//TODO: dem en name ge wo nöd ass isch (Display und s andere display to output move)
+struct Display {
     Extends extends;
     Titlebar titlebar;
     Desktop desktop;
 
-    Fullscreen(Extends ext) : extends(ext), titlebar(t_height(ext)) {
+    Display(Extends ext) : extends(ext), titlebar(t_height(ext)) {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
@@ -179,9 +180,9 @@ Display* focused_display = nullptr;
 
 inline void setFocusedDisplay(Display* display) {
     if(!display || focused_display == display) return;
-    if(focused_display) focused_display->fullscreen->desktop.setFocus(false);
+    if(focused_display) focused_display->desktop.setFocus(false);
     focused_display = display;
-    focused_display->fullscreen->desktop.setFocus(true);
+    focused_display->desktop.setFocus(true);
 }
 
 inline Display* getFocusedDisplay() {
@@ -191,37 +192,38 @@ inline Display* getFocusedDisplay() {
 }
 
 void addSurface(Surface::Toplevel* surface) {
-    getFocusedDisplay()->fullscreen->desktop.addSurface(surface);
+    getFocusedDisplay()->desktop.addSurface(surface);
 }
 
 void removeSurface(Surface::Toplevel* surface) {
-    getFocusedDisplay()->fullscreen->desktop.removeSurface(surface);
+    getFocusedDisplay()->desktop.removeSurface(surface);
 }
 
 void handleCursorMovement(const double x, const double y) {
-    for(Display* display : displays) if(display->fullscreen->contains(x,y)) setFocusedDisplay(display);
-    Surface::Toplevel* surface = getFocusedDisplay()->fullscreen->desktop.getSurfaceAtLocation(x,y);
+    for(Display* display : displays) if(display->contains(x,y)) setFocusedDisplay(display);
+    Surface::Toplevel* surface = getFocusedDisplay()->desktop.getSurfaceAtLocation(x,y);
 
-    focused_display->fullscreen->desktop.setFocusedSurface(surface);
+    focused_display->desktop.setFocusedSurface(surface);
     Input::setCursorFocus(surface);
 }
 
 void setDesktop(uint desktop) {
-    getFocusedDisplay()->fullscreen->titlebar.updateDesktop(desktop);
+    getFocusedDisplay()->titlebar.updateDesktop(desktop);
 }
 
-Display::Display(Extends ext) {
-    displays.push_back(this);
-    fullscreen = std::make_unique<Fullscreen>(ext);
 }
 
-Display::~Display() {
-    displays.remove(this);
-    if(focused_display == this) focused_display = nullptr;
+Output::Display::Display(Extends ext) {
+    displayLayout = new Layout::Display(ext);
+    Layout::displays.push_back(displayLayout);
 }
 
-void Display::updateExtends(Extends ext) {
-    fullscreen->updateExtends(ext);
+Output::Display::~Display() {
+    Layout::displays.remove(displayLayout);
+    if(Layout::focused_display == displayLayout) Layout::focused_display = nullptr;
+    delete displayLayout;
 }
 
+void Output::Display::updateExtends(Extends ext) {
+    displayLayout->updateExtends(ext);
 }

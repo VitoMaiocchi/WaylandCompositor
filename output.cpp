@@ -22,7 +22,7 @@ namespace Output {
         private:
             Extends extends;
             wlr_output* output;
-			std::shared_ptr<Layout::Display> display;
+			std::shared_ptr<Display> display;
     };
 
 	struct MonitorListeners {
@@ -57,7 +57,7 @@ namespace Output {
 		extends.x = scene_output->x;
 		extends.y = scene_output->y;
 
-		display = std::make_shared<Layout::Display>(extends);
+		display = std::make_shared<Display>(extends);
 	}
 
 	void Monitor::frameNotify() {
