@@ -7,34 +7,36 @@
 
 namespace Layout {
 
-//DAS NODE ZÜG BINI NONIG SICHER OBS GUET ISCH
-//abstract base class for different layout types 
-class Base {
-    public:
-        Base(Extends ext);
-        virtual ~Base() = default;
-        void updateExtends(Extends ext);
-        virtual void addSurface(Surface::Toplevel* surface) = 0;
-        virtual Surface::Toplevel* removeSurface(Surface::Toplevel* surface) = 0;
-
-    protected:
-        Extends extends;
-        virtual void updateLayout() = 0;
-};
-
-Base::Base(Extends ext) : extends(ext) {}
-
-void Base::updateExtends(Extends ext) {
-    extends = ext;
-    updateLayout();
-}
-
-struct Linear : public Base {
-    using Base::Base;
-
+//TODO: das chammer abstract mache für meh tiling layouts
+class TilingLayout {
     std::list<Surface::Toplevel*> surfaces;
 
-    void updateLayout() override {
+    public:
+    void addSurface(Surface::Toplevel* surface) {
+        surfaces.push_back(surface);
+    }
+
+    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) {
+        auto it = std::find(surfaces.begin(), surfaces.end(), surface);
+        assert(it != surfaces.end());
+
+        it = surfaces.erase(it);
+
+        if(surfaces.begin() == surfaces.end()) return nullptr;
+        if(it != surfaces.end()) return *it;
+        else return *surfaces.begin();
+    }
+
+    void setVisible(bool visibility) {
+        for(auto surface : surfaces) surface->setVisibility(visibility);
+    }
+
+    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y) {
+        for(auto s : surfaces) if(s->contains(x,y)) return s;
+        return nullptr;
+    }
+
+    void updateLayout(Extends &extends) {
         const uint n = surfaces.size();
         if(n == 0) return;
         const uint h = extends.width / n;
@@ -50,30 +52,37 @@ struct Linear : public Base {
             i++;
         }
     };
-
-    void addSurface(Surface::Toplevel* surface) override {
-        surfaces.push_back(surface);
-        updateLayout();
-    };
-
-    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) override {
-        auto it = std::find(surfaces.begin(), surfaces.end(), surface);
-        assert(it != surfaces.end());
-
-        it = surfaces.erase(it);
-        updateLayout();
-
-        if(surfaces.begin() == surfaces.end()) return nullptr;
-        if(it != surfaces.end()) return *it;
-        else return *surfaces.begin();
-    };
-
-    void forEach(std::function<void(Surface::Toplevel* toplevel)> func) {
-        for(auto surface : surfaces) func(surface);
-    }
 };
 
-//END NODE ZÜG
+class Desktop {
+    TilingLayout tilingLayout;
+    Extends extends;
+
+    public:
+    void addSurface(Surface::Toplevel* surface) {
+        tilingLayout.addSurface(surface);
+        tilingLayout.updateLayout(extends);
+    }
+
+    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) {
+        auto ret = tilingLayout.removeSurface(surface);
+        tilingLayout.updateLayout(extends);
+        return ret;
+    }
+
+    void setVisible(bool visibility) {
+        tilingLayout.setVisible(visibility);
+    }
+
+    void updateExtends(Extends ext) {
+        extends = ext;
+        tilingLayout.updateLayout(ext);
+    }
+
+    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y) {
+        return tilingLayout.getSurfaceAtLocation(x,y);
+    }
+};
 
 //FIXME: temorary workaround. Ich burch e besseri extends class
 Extends t_height(Extends ext) {
@@ -84,13 +93,13 @@ Extends t_height(Extends ext) {
 struct Fullscreen {
     Extends extends;
     Titlebar titlebar;
-    std::unique_ptr<Base> node;
+    Desktop desktop;
 
     Fullscreen(Extends ext) : extends(ext), titlebar(t_height(ext)) {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
-        node = std::make_unique<Linear>(layout_ext);
+        desktop.updateExtends(layout_ext);
     }
 
     void updateExtends(Extends ext) {
@@ -98,7 +107,7 @@ struct Fullscreen {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
-        node->updateExtends(layout_ext);
+        desktop.updateExtends(layout_ext);
         titlebar.updateExtends(t_height(ext));
     }
 
@@ -136,13 +145,13 @@ inline Display* getFocusedDisplay() {
 
 void addSurface(Surface::Toplevel* surface) {
     debug("ADD SURFACE");
-    getFocusedDisplay()->fullscreen->node->addSurface(surface);
+    getFocusedDisplay()->fullscreen->desktop.addSurface(surface);
     setFocus(surface);
     debug("ADD SURFACE end");
 }
 
 void removeSurface(Surface::Toplevel* surface) {
-    auto next = getFocusedDisplay()->fullscreen->node->removeSurface(surface);
+    auto next = getFocusedDisplay()->fullscreen->desktop.removeSurface(surface);
     if(surface == focused_toplevel) {
         if(!next) {
             focused_toplevel = nullptr;
@@ -154,10 +163,7 @@ void removeSurface(Surface::Toplevel* surface) {
 }
 
 void handleCursorMovement(const double x, const double y) {
-    Surface::Toplevel* surface = nullptr;
-    dynamic_cast<Linear*>(getFocusedDisplay()->fullscreen->node.get())->forEach([&surface, x, y](Surface::Toplevel* s){
-        if(s->contains(x,y)) surface = s;
-    });
+    Surface::Toplevel* surface = getFocusedDisplay()->fullscreen->desktop.getSurfaceAtLocation(x,y);
 
     setFocus(surface);
     Input::setCursorFocus(surface);
