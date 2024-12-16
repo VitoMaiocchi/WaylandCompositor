@@ -12,6 +12,8 @@ inline void spawn(const char* cmd) {
     }
 }
 
+//ICH GLAUB DE OPTIONAL POINTER ISCH EN SCHEISS
+
 template <typename T>
 class OptionalPointer {
     uint* ref_count = nullptr; //should not be null

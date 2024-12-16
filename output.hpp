@@ -27,20 +27,4 @@ namespace Output {
             wlr_scene_buffer* scene_buffer;
     };
 
-    //logical representation of one virtual Display (can be assigned to multiple monitors)
-    class Display {
-        public: 
-            Display(Extends ext);
-            ~Display();
-            std::unique_ptr<Layout::Base> layout;
-            void updateExtends(Extends ext);
-
-            uint monitorCount = 0;
-        private:
-            Extends extends;
-    };
-
-    typedef OptionalPointer<Display> DisplayPtr;
-
-    extern std::list<DisplayPtr> displays;
 }

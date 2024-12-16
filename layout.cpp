@@ -7,6 +7,33 @@
 
 namespace Layout {
 
+    Surface::Toplevel* focused_toplevel;
+
+    std::list<Display*> displays;
+    Display* focused_display = nullptr;
+
+    //DAS NODE ZÜG BINI NONIG SICHER OBS GUET ISCH
+    //abstract base class for different layout types 
+    class Base {
+        public:
+            Base(Extends ext);
+            virtual ~Base() = default;
+            void updateExtends(Extends ext);
+            virtual void addSurface(Surface::Toplevel* surface) = 0;
+            virtual Surface::Toplevel* removeSurface(Surface::Toplevel* surface) = 0;
+
+        protected:
+            Extends extends;
+            virtual void updateLayout() = 0;
+    };
+
+    Base::Base(Extends ext) : extends(ext) {}
+
+    void Base::updateExtends(Extends ext) {
+        extends = ext;
+        updateLayout();
+    }
+
     struct Linear : public Base {
         using Base::Base;
 
@@ -51,8 +78,29 @@ namespace Layout {
         }
     };
 
-    Surface::Toplevel* focused_toplevel;
-    Output::DisplayPtr focused_display = nullptr;
+    //END NODE ZÜG
+
+    Display::Display(Extends ext) : extends(ext) {
+        Extends layout_ext = ext;
+		layout_ext.height -= 30;
+		layout_ext.y += 30;
+        node = std::make_unique<Linear>(layout_ext);
+
+        displays.push_back(this);
+    }
+
+    Display::~Display() {
+        displays.remove(this);
+        if(focused_display == this) focused_display = nullptr;
+    }
+
+    void Display::updateExtends(Extends ext) {
+        extends = ext;
+        Extends layout_ext = ext;
+		layout_ext.height -= 30;
+		layout_ext.y += 30;
+        node->updateExtends(layout_ext);
+    }
 
     void inline setFocus(Surface::Toplevel* surface) {
         if(!surface) return;
@@ -65,22 +113,21 @@ namespace Layout {
         surface->setFocus(true);
     }
 
-    inline Output::Display* getFocusedDisplay() {
-        assert(Output::displays.begin() != Output::displays.end());
-        if(!focused_display.get()) focused_display = *Output::displays.begin();
-        assert(focused_display.exists()); //wenns keis display het
-        return focused_display.get();
+    inline Display* getFocusedDisplay() {
+        assert(displays.size() > 0);
+        if(!focused_display) focused_display = *displays.begin();
+        return focused_display;
     }
 
     void addSurface(Surface::Toplevel* surface) {
         debug("ADD SURFACE");
-        getFocusedDisplay()->layout->addSurface(surface);
+        getFocusedDisplay()->node->addSurface(surface);
         setFocus(surface);
         debug("ADD SURFACE end");
     }
 
     void removeSurface(Surface::Toplevel* surface) {
-        auto next = getFocusedDisplay()->layout->removeSurface(surface);
+        auto next = getFocusedDisplay()->node->removeSurface(surface);
         if(surface == focused_toplevel) {
             if(!next) {
                 focused_toplevel = nullptr;
@@ -93,22 +140,11 @@ namespace Layout {
 
     void handleCursorMovement(const double x, const double y) {
         Surface::Toplevel* surface = nullptr;
-        dynamic_cast<Linear*>(getFocusedDisplay()->layout.get())->forEach([&surface, x, y](Surface::Toplevel* s){
+        dynamic_cast<Linear*>(getFocusedDisplay()->node.get())->forEach([&surface, x, y](Surface::Toplevel* s){
             if(s->contains(x,y)) surface = s;
         });
-        //if(!surface) return;
+
         setFocus(surface);
         Input::setCursorFocus(surface);
-    }
-
-    Base::Base(Extends ext) : extends(ext) {}
-
-    void Base::updateExtends(Extends ext) {
-        extends = ext;
-        updateLayout();
-    }
-
-    std::unique_ptr<Base> generateNewLayout(Extends ext) {
-        return std::make_unique<Linear>(ext);
     }
 }

@@ -21,8 +21,6 @@ void draw(cairo_t* cr) {
 
 namespace Output {
 
-	std::list<DisplayPtr> displays;
-
 	//MONITOR BEGIN
 	wl_listener new_output_listener;
 	wlr_scene_output_layout* scene_layout;
@@ -37,7 +35,7 @@ namespace Output {
         private:
             Extends extends;
             wlr_output* output;
-			DisplayPtr display = nullptr;
+			std::shared_ptr<Layout::Display> display;
     };
 
 	struct MonitorListeners {
@@ -72,8 +70,7 @@ namespace Output {
 		extends.x = scene_output->x;
 		extends.y = scene_output->y;
 
-		display = new Display(extends);
-		displays.push_back(display);
+		display = std::make_shared<Layout::Display>(extends);
 
 		//TEST
 		Buffer* buffer = new Buffer();
@@ -149,44 +146,6 @@ namespace Output {
     }
 
 	//MONITOR END
-
-
-
-
-
-	//DISPALY
-	Display::Display(Extends ext) : extends(ext) {
-		Extends layout_ext = ext;
-		layout_ext.height -= 30;
-		layout_ext.y += 30;
-		layout = Layout::generateNewLayout(layout_ext);
-		monitorCount = 1;
-	}
-
-	Display::~Display() {
-		auto it = std::find_if(displays.begin(), displays.end(), [this](DisplayPtr ptr){
-			return ptr.get() == this; 
-		});
-		assert(it != displays.end());
-		displays.erase(it);
-	}
-
-	void Display::updateExtends(Extends ext) {
-		extends = ext;
-		Extends layout_ext = ext;
-		layout_ext.height -= 30;
-		layout_ext.y += 30;
-		layout->updateExtends(layout_ext);
-	}
-
-	//DISPLAY END
-
-
-
-
-
-
-
 
 
 
