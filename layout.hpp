@@ -13,7 +13,7 @@ namespace Layout {
     void handleCursorMovement(const double x, const double y);
     void setDesktop(uint desktop);
 
-    struct Display;
+    class Display;
 }
 
 namespace Output {

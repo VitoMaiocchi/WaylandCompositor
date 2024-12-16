@@ -144,11 +144,12 @@ Extends t_height(Extends ext) {
 }
 
 //TODO: dem en name ge wo nöd ass isch (Display und s andere display to output move)
-struct Display {
+class Display {
     Extends extends;
     Titlebar titlebar;
     Desktop desktop;
 
+    public:
     Display(Extends ext) : extends(ext), titlebar(t_height(ext)) {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
@@ -173,6 +174,28 @@ struct Display {
         if(extends.y + extends.height < y) return false;
         return true;
     }
+
+    void setFocus(bool focus) {
+        desktop.setFocus(focus);
+    }
+
+    void handleCursorMovement(const double x, const double y) {
+        const auto surface = desktop.getSurfaceAtLocation(x,y);
+        desktop.setFocusedSurface(surface);
+        Input::setCursorFocus(surface);
+    }
+
+    void addSurface(Surface::Toplevel* surface) {
+        desktop.addSurface(surface);
+    }
+
+    void removeSurface(Surface::Toplevel* surface) {
+        desktop.removeSurface(surface);
+    }
+
+    void setDesktop(uint desktop) {
+        titlebar.updateDesktop(desktop);
+    }
 };
 
 std::list<Display*> displays;
@@ -180,9 +203,9 @@ Display* focused_display = nullptr;
 
 inline void setFocusedDisplay(Display* display) {
     if(!display || focused_display == display) return;
-    if(focused_display) focused_display->desktop.setFocus(false);
+    if(focused_display) focused_display->setFocus(false);
     focused_display = display;
-    focused_display->desktop.setFocus(true);
+    focused_display->setFocus(true);
 }
 
 inline Display* getFocusedDisplay() {
@@ -192,25 +215,24 @@ inline Display* getFocusedDisplay() {
 }
 
 void addSurface(Surface::Toplevel* surface) {
-    getFocusedDisplay()->desktop.addSurface(surface);
+    getFocusedDisplay()->addSurface(surface);
     surface->setVisibility(true);
 }
 
 void removeSurface(Surface::Toplevel* surface) {
-    getFocusedDisplay()->desktop.removeSurface(surface);
+    getFocusedDisplay()->removeSurface(surface);
     surface->setVisibility(false);
 }
 
 void handleCursorMovement(const double x, const double y) {
-    for(Display* display : displays) if(display->contains(x,y)) setFocusedDisplay(display);
-    Surface::Toplevel* surface = getFocusedDisplay()->desktop.getSurfaceAtLocation(x,y);
-
-    focused_display->desktop.setFocusedSurface(surface);
-    Input::setCursorFocus(surface);
+    if(!getFocusedDisplay()->contains(x,y))
+        for(Display* display : displays) if(display->contains(x,y)) setFocusedDisplay(display);
+    
+    getFocusedDisplay()->handleCursorMovement(x,y);
 }
 
 void setDesktop(uint desktop) {
-    getFocusedDisplay()->titlebar.updateDesktop(desktop);
+    getFocusedDisplay()->setDesktop(desktop);
 }
 
 }
