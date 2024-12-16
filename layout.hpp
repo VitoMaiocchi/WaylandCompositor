@@ -3,6 +3,7 @@
 #include "includes.hpp"
 #include "surface.hpp"
 #include "output.hpp"
+#include "titlebar.hpp"
 #include <memory>
 
 namespace Layout {
@@ -25,5 +26,6 @@ namespace Layout {
 
         private:
         Extends extends;
+        Titlebar titlebar;
     };
 }

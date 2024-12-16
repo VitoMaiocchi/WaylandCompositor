@@ -80,7 +80,13 @@ namespace Layout {
 
     //END NODE ZÜG
 
-    Display::Display(Extends ext) : extends(ext) {
+    //FIXME: temorary workaround. Ich burch e besseri extends class
+    Extends t_height(Extends ext) {
+        ext.height = 30;
+        return ext;
+    }
+
+    Display::Display(Extends ext) : extends(ext), titlebar(t_height(ext)) {
         Extends layout_ext = ext;
 		layout_ext.height -= 30;
 		layout_ext.y += 30;
@@ -100,6 +106,16 @@ namespace Layout {
 		layout_ext.height -= 30;
 		layout_ext.y += 30;
         node->updateExtends(layout_ext);
+        titlebar.updateExtends(t_height(ext));
+    }
+
+    //FIXME: temorary workaround. Ich burch e besseri extends class
+    bool Display::contains(const double x, const double y) {
+        if(extends.x > x) return false;
+		if(extends.x + extends.width < x) return false;
+		if(extends.y > y) return false;
+		if(extends.y + extends.height < y) return false;
+		return true;
     }
 
     void inline setFocus(Surface::Toplevel* surface) {
@@ -136,14 +152,6 @@ namespace Layout {
             focused_toplevel = next;
             focused_toplevel->setFocus(true);
         }
-    }
-
-    bool Display::contains(const double x, const double y) {
-        if(extends.x > x) return false;
-		if(extends.x + extends.width < x) return false;
-		if(extends.y > y) return false;
-		if(extends.y + extends.height < y) return false;
-		return true;
     }
 
     void handleCursorMovement(const double x, const double y) {
