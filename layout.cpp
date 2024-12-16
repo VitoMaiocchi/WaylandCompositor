@@ -7,6 +7,21 @@
 
 namespace Layout {
 
+/*
+Surface::Toplevel* focused_toplevel;
+
+void inline setFocus(Surface::Toplevel* surface) {
+    if(!surface) return;
+    if(focused_toplevel) {
+        if(focused_toplevel == surface) return;
+        focused_toplevel->setFocus(false);
+        focused_toplevel = surface;
+    }
+    focused_toplevel = surface;
+    surface->setFocus(true);
+}
+*/
+
 //TODO: das chammer abstract mache für meh tiling layouts
 class TilingLayout {
     std::list<Surface::Toplevel*> surfaces;
@@ -52,25 +67,63 @@ class TilingLayout {
             i++;
         }
     };
+
+    typedef std::list<Surface::Toplevel*>::iterator iterator;
+
+    iterator begin() {
+        return surfaces.begin();
+    }
+
+    iterator end() {
+        return surfaces.end();
+    }
 };
 
 class Desktop {
     TilingLayout tilingLayout;
     Extends extends;
+    Surface::Toplevel* focused_toplevel = nullptr;
+    bool focused = false;
 
     public:
+    void setFocusedSurface(Surface::Toplevel* surface) {
+        if(!surface || focused_toplevel == surface) return;
+        if(!focused) {
+            focused_toplevel = surface;
+            return;
+        }
+        if(focused_toplevel) focused_toplevel->setFocus(false);
+        focused_toplevel = surface;
+        focused_toplevel->setFocus(true);
+    }
+
     void addSurface(Surface::Toplevel* surface) {
         tilingLayout.addSurface(surface);
         tilingLayout.updateLayout(extends);
+        setFocusedSurface(surface);
     }
 
-    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) {
-        auto ret = tilingLayout.removeSurface(surface);
+    void removeSurface(Surface::Toplevel* surface) {
+        auto new_focus = tilingLayout.removeSurface(surface);
         tilingLayout.updateLayout(extends);
-        return ret;
+        if(focused_toplevel != surface) return;
+        if(new_focus) setFocusedSurface(new_focus);
+        else focused_toplevel = nullptr;
     }
 
-    void setVisible(bool visibility) {
+    void setFocus(bool focus) {
+        //TODO: nöd automatisch focus remove wenn mer uf en andere bildschirm gaht (de surface focus semi global mache)
+        focused = focus;
+        if(!focused_toplevel) {
+            auto it = tilingLayout.begin();
+            if(it == tilingLayout.end()) return;
+            focused_toplevel = *it;
+        }
+
+        focused_toplevel->setFocus(focus);
+    }
+
+    void setVisibility(bool visibility) {
         tilingLayout.setVisible(visibility);
     }
 
@@ -121,54 +174,36 @@ struct Fullscreen {
     }
 };
 
-Surface::Toplevel* focused_toplevel;
-
 std::list<Display*> displays;
 Display* focused_display = nullptr;
 
-void inline setFocus(Surface::Toplevel* surface) {
-    if(!surface) return;
-    if(focused_toplevel) {
-        if(focused_toplevel == surface) return;
-        focused_toplevel->setFocus(false);
-        focused_toplevel = surface;
-    }
-    focused_toplevel = surface;
-    surface->setFocus(true);
+inline void setFocusedDisplay(Display* display) {
+    if(!display || focused_display == display) return;
+    if(focused_display) focused_display->fullscreen->desktop.setFocus(false);
+    focused_display = display;
+    focused_display->fullscreen->desktop.setFocus(true);
 }
 
 inline Display* getFocusedDisplay() {
     assert(displays.size() > 0);
-    if(!focused_display) focused_display = *displays.begin();
+    if(!focused_display) setFocusedDisplay(*displays.begin());
     return focused_display;
 }
 
 void addSurface(Surface::Toplevel* surface) {
-    debug("ADD SURFACE");
     getFocusedDisplay()->fullscreen->desktop.addSurface(surface);
-    setFocus(surface);
-    debug("ADD SURFACE end");
 }
 
 void removeSurface(Surface::Toplevel* surface) {
-    auto next = getFocusedDisplay()->fullscreen->desktop.removeSurface(surface);
-    if(surface == focused_toplevel) {
-        if(!next) {
-            focused_toplevel = nullptr;
-            return;
-        }
-        focused_toplevel = next;
-        focused_toplevel->setFocus(true);
-    }
+    getFocusedDisplay()->fullscreen->desktop.removeSurface(surface);
 }
 
 void handleCursorMovement(const double x, const double y) {
+    for(Display* display : displays) if(display->fullscreen->contains(x,y)) setFocusedDisplay(display);
     Surface::Toplevel* surface = getFocusedDisplay()->fullscreen->desktop.getSurfaceAtLocation(x,y);
 
-    setFocus(surface);
+    focused_display->fullscreen->desktop.setFocusedSurface(surface);
     Input::setCursorFocus(surface);
-
-    for(Display* display : displays) if(display->fullscreen->contains(x,y)) focused_display = display;
 }
 
 void setDesktop(uint desktop) {

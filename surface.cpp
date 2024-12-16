@@ -33,6 +33,7 @@ namespace Surface {
 	}
 	
 	void Toplevel::setFocus(bool focus) {
+		//FIXME: remove keyboard wenn unfocus
 		if(focus == focused) return;
 		focused = focus;
 		if(!visible) return;
