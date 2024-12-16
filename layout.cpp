@@ -193,10 +193,12 @@ inline Display* getFocusedDisplay() {
 
 void addSurface(Surface::Toplevel* surface) {
     getFocusedDisplay()->desktop.addSurface(surface);
+    surface->setVisibility(true);
 }
 
 void removeSurface(Surface::Toplevel* surface) {
     getFocusedDisplay()->desktop.removeSurface(surface);
+    surface->setVisibility(false);
 }
 
 void handleCursorMovement(const double x, const double y) {

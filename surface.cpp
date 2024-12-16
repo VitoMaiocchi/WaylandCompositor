@@ -90,15 +90,8 @@ namespace Surface {
 	}
 
 	void Toplevel::mapNotify(bool mapped) {
-		if(mapped) {
-			Layout::addSurface(this);
-			setVisibility(true);
-			return;
-		}
-
-		//remove surface from layout
-		Layout::removeSurface(this);
-		setVisibility(false);
+		if(mapped) Layout::addSurface(this);
+		else Layout::removeSurface(this);
 	}
 
 	void Toplevel::extendsUpdateNotify(bool resize) {
