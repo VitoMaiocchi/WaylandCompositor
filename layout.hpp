@@ -13,19 +13,14 @@ namespace Layout {
     void handleCursorMovement(const double x, const double y);
     void setDesktop(uint desktop);
 
-    class Base;
+    struct Fullscreen;
 
     //logical representation of one or multiple mirrored monitors
-    class Display {
-        Extends extends;
-        
-        public:
+    struct Display {
         Display(Extends ext);
         ~Display();
         void updateExtends(Extends ext);
-        bool contains(const double x, const double y);
 
-        std::unique_ptr<Base> node;
-        Titlebar titlebar;
+        std::unique_ptr<Fullscreen> fullscreen;
     };
 }

@@ -7,11 +7,6 @@
 
 namespace Layout {
 
-    Surface::Toplevel* focused_toplevel;
-
-    std::list<Display*> displays;
-    Display* focused_display = nullptr;
-
     //DAS NODE ZÜG BINI NONIG SICHER OBS GUET ISCH
     //abstract base class for different layout types 
     class Base {
@@ -86,37 +81,41 @@ namespace Layout {
         return ext;
     }
 
-    Display::Display(Extends ext) : extends(ext), titlebar(t_height(ext)) {
-        Extends layout_ext = ext;
-		layout_ext.height -= 30;
-		layout_ext.y += 30;
-        node = std::make_unique<Linear>(layout_ext);
+    struct Fullscreen {
+        Extends extends;
+        Titlebar titlebar;
+        std::unique_ptr<Base> node;
 
-        displays.push_back(this);
-    }
+        Fullscreen(Extends ext) : extends(ext), titlebar(t_height(ext)) {
+            Extends layout_ext = ext;
+            layout_ext.height -= 30;
+            layout_ext.y += 30;
+            node = std::make_unique<Linear>(layout_ext);
+        }
 
-    Display::~Display() {
-        displays.remove(this);
-        if(focused_display == this) focused_display = nullptr;
-    }
+        void updateExtends(Extends ext) {
+            extends = ext;
+            Extends layout_ext = ext;
+            layout_ext.height -= 30;
+            layout_ext.y += 30;
+            node->updateExtends(layout_ext);
+            titlebar.updateExtends(t_height(ext));
+        }
 
-    void Display::updateExtends(Extends ext) {
-        extends = ext;
-        Extends layout_ext = ext;
-		layout_ext.height -= 30;
-		layout_ext.y += 30;
-        node->updateExtends(layout_ext);
-        titlebar.updateExtends(t_height(ext));
-    }
+        //FIXME: temorary workaround. Ich burch e besseri extends class
+        bool contains(const double x, const double y) {
+            if(extends.x > x) return false;
+            if(extends.x + extends.width < x) return false;
+            if(extends.y > y) return false;
+            if(extends.y + extends.height < y) return false;
+            return true;
+        }
+    };
 
-    //FIXME: temorary workaround. Ich burch e besseri extends class
-    bool Display::contains(const double x, const double y) {
-        if(extends.x > x) return false;
-		if(extends.x + extends.width < x) return false;
-		if(extends.y > y) return false;
-		if(extends.y + extends.height < y) return false;
-		return true;
-    }
+    Surface::Toplevel* focused_toplevel;
+
+    std::list<Display*> displays;
+    Display* focused_display = nullptr;
 
     void inline setFocus(Surface::Toplevel* surface) {
         if(!surface) return;
@@ -137,13 +136,13 @@ namespace Layout {
 
     void addSurface(Surface::Toplevel* surface) {
         debug("ADD SURFACE");
-        getFocusedDisplay()->node->addSurface(surface);
+        getFocusedDisplay()->fullscreen->node->addSurface(surface);
         setFocus(surface);
         debug("ADD SURFACE end");
     }
 
     void removeSurface(Surface::Toplevel* surface) {
-        auto next = getFocusedDisplay()->node->removeSurface(surface);
+        auto next = getFocusedDisplay()->fullscreen->node->removeSurface(surface);
         if(surface == focused_toplevel) {
             if(!next) {
                 focused_toplevel = nullptr;
@@ -156,17 +155,32 @@ namespace Layout {
 
     void handleCursorMovement(const double x, const double y) {
         Surface::Toplevel* surface = nullptr;
-        dynamic_cast<Linear*>(getFocusedDisplay()->node.get())->forEach([&surface, x, y](Surface::Toplevel* s){
+        dynamic_cast<Linear*>(getFocusedDisplay()->fullscreen->node.get())->forEach([&surface, x, y](Surface::Toplevel* s){
             if(s->contains(x,y)) surface = s;
         });
 
         setFocus(surface);
         Input::setCursorFocus(surface);
 
-        for(Display* display : displays) if(display->contains(x,y)) focused_display = display;
+        for(Display* display : displays) if(display->fullscreen->contains(x,y)) focused_display = display;
     }
 
     void setDesktop(uint desktop) {
-        getFocusedDisplay()->titlebar.updateDesktop(desktop);
+        getFocusedDisplay()->fullscreen->titlebar.updateDesktop(desktop);
     }
+
+    Display::Display(Extends ext) {
+        displays.push_back(this);
+        fullscreen = std::make_unique<Fullscreen>(ext);
+    }
+
+    Display::~Display() {
+        displays.remove(this);
+        if(focused_display == this) focused_display = nullptr;
+    }
+
+    void Display::updateExtends(Extends ext) {
+        fullscreen->updateExtends(ext);
+    }
+
 }
