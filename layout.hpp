@@ -11,11 +11,14 @@ namespace Layout {
     void addSurface(Surface::Toplevel* surface);
     void removeSurface(Surface::Toplevel* surface);
     void handleCursorMovement(const double x, const double y);
+    void setDesktop(uint desktop);
 
     class Base;
 
     //logical representation of one or multiple mirrored monitors
     class Display {
+        Extends extends;
+        
         public:
         Display(Extends ext);
         ~Display();
@@ -23,9 +26,6 @@ namespace Layout {
         bool contains(const double x, const double y);
 
         std::unique_ptr<Base> node;
-
-        private:
-        Extends extends;
         Titlebar titlebar;
     };
 }

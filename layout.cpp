@@ -165,4 +165,8 @@ namespace Layout {
 
         for(Display* display : displays) if(display->contains(x,y)) focused_display = display;
     }
+
+    void setDesktop(uint desktop) {
+        getFocusedDisplay()->titlebar.updateDesktop(desktop);
+    }
 }
