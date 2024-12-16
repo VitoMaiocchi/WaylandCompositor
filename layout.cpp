@@ -147,14 +147,16 @@ Extends t_height(Extends ext) {
 class Display {
     Extends extends;
     Titlebar titlebar;
-    Desktop desktop;
+    Desktop desktops[9];
+    uint current_desktop = 0;
+    bool focus = false;
 
     public:
     Display(Extends ext) : extends(ext), titlebar(t_height(ext)) {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
-        desktop.updateExtends(layout_ext);
+        for(auto &desktop : desktops) desktop.updateExtends(layout_ext);
     }
 
     void updateExtends(Extends ext) {
@@ -162,7 +164,7 @@ class Display {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
-        desktop.updateExtends(layout_ext);
+        for(auto &desktop : desktops) desktop.updateExtends(layout_ext);
         titlebar.updateExtends(t_height(ext));
     }
 
@@ -176,25 +178,31 @@ class Display {
     }
 
     void setFocus(bool focus) {
-        desktop.setFocus(focus);
+        this->focus = focus;
+        desktops[current_desktop].setFocus(focus);
     }
 
     void handleCursorMovement(const double x, const double y) {
-        const auto surface = desktop.getSurfaceAtLocation(x,y);
-        desktop.setFocusedSurface(surface);
+        const auto surface = desktops[current_desktop].getSurfaceAtLocation(x,y);
+        desktops[current_desktop].setFocusedSurface(surface);
         Input::setCursorFocus(surface);
     }
 
     void addSurface(Surface::Toplevel* surface) {
-        desktop.addSurface(surface);
+        desktops[current_desktop].addSurface(surface);
     }
 
     void removeSurface(Surface::Toplevel* surface) {
-        desktop.removeSurface(surface);
+        desktops[current_desktop].removeSurface(surface);
     }
 
     void setDesktop(uint desktop) {
         titlebar.updateDesktop(desktop);
+        desktops[current_desktop].setVisibility(false);
+        desktops[current_desktop].setFocus(false);
+        current_desktop = desktop;
+        desktops[current_desktop].setVisibility(true);
+        desktops[current_desktop].setFocus(true);
     }
 };
 
