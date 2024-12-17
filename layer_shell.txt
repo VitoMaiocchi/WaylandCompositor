@@ -1,0 +1,55 @@
+alte layershell code wo ich wahrschinlich nüm bruch.
+
+setup:
+		//todo: chönt mer no LAYER SHELL IMPLEMENT das isch für so rofi und so
+		/*
+		server.layer_shell = wlr_layer_shell_v1_create(server.display, 4);
+		server.new_layer_shell_surface.notify = layer_shell_new_surface;
+		server.delete_layer_shell_surface.notify = layer_shell_delete_surface;
+		wl_signal_add(&server.layer_shell->events.new_surface, &server.new_layer_shell_surface);
+		//DELTE isch glaub wenn LAYERSHELL DELTED WIRD nöd die SURFACE
+		wl_signal_add(&server.layer_shell->events.destroy, &server.delete_layer_shell_surface);
+		wl_list_init(&lss_list);
+		//server.layer_shell->events.new_surface
+		*/
+
+functions:
+
+
+	//LAYER SHELL ULTRA BASIC
+	/*
+	struct LayerShellSurface {
+		struct wl_list link;
+		struct wlr_layer_surface_v1* ls_surface; 
+		struct wlr_scene_layer_surface_v1* surface_node;
+	};
+
+	struct wl_list lss_list;
+
+	void layer_shell_new_surface(struct wl_listener *listener, void *data) {
+		struct wlr_layer_surface_v1* surface = (wlr_layer_surface_v1*) data;
+		if(!surface) return;
+
+		struct LayerShellSurface* lss = (LayerShellSurface* ) calloc(1, sizeof(struct LayerShellSurface));
+		wl_list_insert(&lss_list, &lss->link);
+		lss->ls_surface = surface;
+
+		struct wlr_output* output = surface->output;
+		if(!output) {
+			if (wl_list_empty(&server.outputs)) return;
+			struct WaylandOutput* wlo = wl_container_of(server.outputs.next, wlo, link);
+			output = wlo->wlr_output;
+		}
+
+		lss->surface_node = wlr_scene_layer_surface_v1_create(&server.scene->tree, surface);
+		//fixme: ULTRA JANKY (0,0) ich muss für das zerscht d outputs besser mache
+		wlr_scene_node_set_position(&lss->surface_node->tree->node, 0, 0);
+		wlr_layer_surface_v1_configure(surface, output->width, output->height);
+
+		//todo: FREE LAYERSHELL eventually -> memory leak
+	}
+
+	void layer_shell_delete_surface(struct wl_listener *listener, void *data) {
+		//idk ob ich da was will
+	}
+	*/
