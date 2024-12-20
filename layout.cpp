@@ -143,7 +143,6 @@ Extends t_height(Extends ext) {
     return ext;
 }
 
-//TODO: dem en name ge wo nöd ass isch (Display und s andere display to output move)
 class Display {
     Extends extends;
     Titlebar titlebar;

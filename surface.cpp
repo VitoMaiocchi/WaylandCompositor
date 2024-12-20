@@ -85,7 +85,7 @@ namespace Surface {
 		if(focused) Input::setKeyboardFocus(this);
 	}
 
-	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) {
+	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) const {
 		return {x - (extends.x + BORDERWIDTH), y - (extends.y + BORDERWIDTH)};
 	}
 
@@ -145,6 +145,8 @@ namespace Surface {
 			this->xdg_toplevel = xdg_toplevel;
 			root_node = wlr_scene_tree_create(&Output::scene->tree);
 			surface_node = wlr_scene_xdg_surface_create(root_node, xdg_toplevel->base);
+
+			xdg_toplevel->base->surface->data = root_node; //TEMPORARY
 		}
 
         ~XdgToplevel() {
@@ -175,7 +177,7 @@ namespace Surface {
 		wlr_xdg_toplevel* xdg_toplevel = (wlr_xdg_toplevel*) data;
 		xdg_shell_surface_listeners* listeners = new xdg_shell_surface_listeners();
 		listeners->surface = new XdgToplevel(xdg_toplevel);
-		xdg_toplevel->base->surface->data = listeners->surface;
+		//xdg_toplevel->base->surface->data = listeners->surface; TODO: Popup mit surface
 		wlr_log(WLR_DEBUG, "new xdg toplevel %p", listeners->surface);
 
 				//CONFIGURE LISTENERS
@@ -214,8 +216,14 @@ namespace Surface {
 			wlr_log(WLR_DEBUG, "XDG toplevel new popup: no parent");
 			return;
 		}
-		Base* surface = (Base*) xdg_popup->parent->data;
-		wlr_log(WLR_DEBUG, "XDG toplevel new popup with parent: %p", surface);
+
+		wlr_log(WLR_DEBUG, "XDG toplevel new popup with parent: %p", xdg_popup->parent);
+
+		//FIXME: porbably memory leak but placeholder so I don't care
+		auto root_node = wlr_scene_xdg_surface_create((wlr_scene_tree*) xdg_popup->parent->data, xdg_popup->base);
+		xdg_popup->base->surface->data = root_node;
+		wlr_xdg_surface_schedule_configure(xdg_popup->base);
+
 		//TODO create xdg popup
 	}
 
@@ -232,6 +240,8 @@ namespace Surface {
         XwaylandToplevel(wlr_xwayland_surface* xwayland_surface) {
 			this->xwayland_surface = xwayland_surface;
 			root_node = wlr_scene_tree_create(&Output::scene->tree);
+
+			xwayland_surface->data = root_node; //TEMPORARY
 		}
 
 		void map(bool map) {
@@ -291,26 +301,53 @@ namespace Surface {
 		}
 	};
 
+	//TODO: all this stuff is ugly and placeholder
+	xcb_window_t getLeader(xcb_window_t window);
+	std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
+
 	void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
-		debug("NEW XWAYLAND SURFACE NOTIFY");
+		wlr_log(WLR_DEBUG, "NEW XWAYLAND SURFACE NOTIFY: %p", data);
 		wlr_xwayland_surface* surface = (wlr_xwayland_surface*) data;
 		auto listeners = new xwayland_surface_listeners;
 		listeners->wlr_surface = surface;
+
+		wlr_log(WLR_DEBUG, "process: %u", listeners->wlr_surface->pid);
+		wlr_log(WLR_DEBUG, "window: %#010x", listeners->wlr_surface->window_id);
+		wlr_log(WLR_DEBUG, "XCB client leader: %#010x", getLeader(listeners->wlr_surface->window_id));
 
 		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
 			listeners->type = getXWaylandWindowType(listeners->wlr_surface);
 
-			wlr_log(WLR_DEBUG, "surface %p is now associated", listeners->surface);
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
-					debug("new xwayland toplevel");
+					wlr_log(WLR_DEBUG, "new Xwayland Toplevel: %p", listeners->wlr_surface);
 					listeners->surface = new XwaylandToplevel(listeners->wlr_surface);
 					listeners->tryMap();
+					{
+						auto leader = getLeader(listeners->wlr_surface->window_id);
+						if(fallbackToplevels.find(leader) == fallbackToplevels.end())
+							fallbackToplevels[leader] = listeners->wlr_surface;
+					}
 				break;
 				case XWAYLAND_POPUP:
-					debug("new xwayland popup");
-					//TODO
+					wlr_log(WLR_DEBUG, "new Xwayland popup: %p", listeners->wlr_surface);
+					{
+					//TODO das nöd scheisse une mit base surface inheritance und so
+					wlr_scene_tree* parent = (wlr_scene_tree*) listeners->wlr_surface->parent->data;
+					if(!parent) {
+						//the parent can sometimes be a unassocied suface
+						auto leader = getLeader(listeners->wlr_surface->parent->window_id);
+						assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
+						parent = (wlr_scene_tree*) fallbackToplevels[leader]->data;
+					}
+
+					auto size = listeners->wlr_surface->size_hints;
+					wlr_scene_tree* root_node = wlr_scene_subsurface_tree_create(parent, listeners->wlr_surface->surface);
+					listeners->wlr_surface->data = root_node;
+					wlr_scene_node_set_position(&root_node->node, size->x, size->y);
+					wlr_xwayland_surface_configure(listeners->wlr_surface, size->x, size->y, size->width, size->height);
+					}
 				break;
 				default:
 				debug("xwayland surface of unknown type");
@@ -343,6 +380,7 @@ namespace Surface {
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
 					debug("disassociate xwayland toplevel");
+					//BUG: ab und zue crashed es da. VLC: video luege
 					listeners->surface->map(false);
 				break;
 				case XWAYLAND_POPUP:
@@ -441,44 +479,57 @@ namespace Surface {
 	//XCB ATOM STUFF
 	//TODO: clean up this code
 	enum Atom {
-		NET_WM_WINDOW_TYPE_NORMAL,
-		NET_WM_WINDOW_TYPE_DIALOG,
-		NET_WM_WINDOW_TYPE_UTILITY,
-		NET_WM_WINDOW_TYPE_TOOLBAR,
-		NET_WM_WINDOW_TYPE_SPLASH,
-		NET_WM_WINDOW_TYPE_MENU,
-		NET_WM_WINDOW_TYPE_DROPDOWN_MENU,
-		NET_WM_WINDOW_TYPE_POPUP_MENU,
-		NET_WM_WINDOW_TYPE_TOOLTIP,
-		NET_WM_WINDOW_TYPE_NOTIFICATION,
-		NET_WM_STATE_MODAL,
-		ATOM_LAST,
+		NET_WM_WINDOW_TYPE_NORMAL,         // A standard top-level application window.
+		NET_WM_WINDOW_TYPE_DIALOG,         // A dialog window, usually modal, requiring user input.
+		NET_WM_WINDOW_TYPE_UTILITY,        // A utility window, often used for small helper apps or toolboxes.
+		NET_WM_WINDOW_TYPE_TOOLBAR,        // A toolbar window, typically attached to a parent application.
+		NET_WM_WINDOW_TYPE_SPLASH,         // A splash screen, usually displayed during application startup.
+		NET_WM_WINDOW_TYPE_MENU,           // A standalone menu window.
+		NET_WM_WINDOW_TYPE_DROPDOWN_MENU,  // A dropdown menu, usually attached to a menu button.
+		NET_WM_WINDOW_TYPE_POPUP_MENU,     // A popup menu, appearing on right-click or similar events.
+		NET_WM_WINDOW_TYPE_TOOLTIP,        // A tooltip window, used for brief context help or information.
+		NET_WM_WINDOW_TYPE_NOTIFICATION,   // A notification window, often used for alerts or system messages.
+		NET_WM_WINDOW_TYPE_DESKTOP,        // A desktop background or workspace root window.
+		NET_WM_WINDOW_TYPE_DOCK,           // A dock or panel, such as taskbars or status bars.
+		NET_WM_WINDOW_TYPE_COMBO,          // A combo box dropdown or selection menu.
+		NET_WM_WINDOW_TYPE_DND,            // A drag-and-drop icon or preview window.
+		NET_WM_STATE_MODAL,                // A modal window, blocking interaction with other windows.
+		ATOM_LAST
 	};
 
 	const char* atom_string[ATOM_LAST] = {
-		[NET_WM_WINDOW_TYPE_NORMAL] 		= "_NET_WM_WINDOW_TYPE_NORMAL",
-		[NET_WM_WINDOW_TYPE_DIALOG] 		= "_NET_WM_WINDOW_TYPE_DIALOG",
-		[NET_WM_WINDOW_TYPE_UTILITY] 		= "_NET_WM_WINDOW_TYPE_UTILITY",
-		[NET_WM_WINDOW_TYPE_TOOLBAR] 		= "_NET_WM_WINDOW_TYPE_TOOLBAR",
-		[NET_WM_WINDOW_TYPE_SPLASH] 		= "_NET_WM_WINDOW_TYPE_SPLASH",
-		[NET_WM_WINDOW_TYPE_MENU] 			= "_NET_WM_WINDOW_TYPE_MENU",
-		[NET_WM_WINDOW_TYPE_DROPDOWN_MENU] 	= "_NET_WM_WINDOW_TYPE_DROPDOWN_MENU",
-		[NET_WM_WINDOW_TYPE_POPUP_MENU] 	= "_NET_WM_WINDOW_TYPE_POPUP_MENU",
-		[NET_WM_WINDOW_TYPE_TOOLTIP] 		= "_NET_WM_WINDOW_TYPE_TOOLTIP",
-		[NET_WM_WINDOW_TYPE_NOTIFICATION] 	= "_NET_WM_WINDOW_TYPE_NOTIFICATION",
-		[NET_WM_STATE_MODAL] 				= "_NET_WM_STATE_MODAL",
+		"_NET_WM_WINDOW_TYPE_NORMAL",
+		"_NET_WM_WINDOW_TYPE_DIALOG",
+		"_NET_WM_WINDOW_TYPE_UTILITY",
+		"_NET_WM_WINDOW_TYPE_TOOLBAR",
+		"_NET_WM_WINDOW_TYPE_SPLASH",
+		"_NET_WM_WINDOW_TYPE_MENU",
+		"_NET_WM_WINDOW_TYPE_DROPDOWN_MENU",
+		"_NET_WM_WINDOW_TYPE_POPUP_MENU",
+		"_NET_WM_WINDOW_TYPE_TOOLTIP",
+		"_NET_WM_WINDOW_TYPE_NOTIFICATION",
+		"_NET_WM_WINDOW_TYPE_DESKTOP",
+		"_NET_WM_WINDOW_TYPE_DOCK",
+		"_NET_WM_WINDOW_TYPE_COMBO",
+		"_NET_WM_WINDOW_TYPE_DND",
+		"_NET_WM_STATE_MODAL",
 	};
 
-	/*
-	die gis au no 
-	"_NET_WM_WINDOW_TYPE_DESKTOP",
-    "_NET_WM_WINDOW_TYPE_DOCK",
-    "_NET_WM_WINDOW_TYPE_COMBO",
-    "_NET_WM_WINDOW_TYPE_DND",
-	*/
-
-
 	std::map<xcb_atom_t, Atom> atoms;
+
+	xcb_atom_t WM_CLIENT_LEADER = XCB_ATOM_NONE;
+
+	xcb_window_t getLeader(xcb_window_t window) {
+		xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
+		if(!WM_CLIENT_LEADER) return 0;
+		auto cookie = xcb_get_property(xc, 0, window, WM_CLIENT_LEADER, XCB_ATOM_ANY, 0, 2048);
+		auto reply = xcb_get_property_reply(xc, cookie, 0);
+		if(!reply) return 0;
+		xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
+		free(reply);
+		if(xid) return *xid;
+		return 0;
+	} 
 
 	std::set<Atom> getAtoms(xcb_atom_t* atom_array, size_t size) {
 		std::set<Atom> a;
@@ -511,6 +562,27 @@ namespace Surface {
 				atoms[reply->atom] = atom;
 			free(reply);
 		}
+
+		//client leader seperatly (needed in the other direction not the map)
+		xcb_intern_atom_cookie_t cookie2 = xcb_intern_atom(xc, 0, strlen("WM_CLIENT_LEADER"), "WM_CLIENT_LEADER");
+		xcb_intern_atom_reply_t *reply2 = xcb_intern_atom_reply(xc, cookie2, NULL);
+		if(reply2) WM_CLIENT_LEADER = reply2->atom;
+		free(reply2);
 	}
+
+	/*
+	TODO: xWayland selber implemente
+
+	get parent:
+	xcb_connection_t *xc = xcb_connect(xwayland->display_name, NULL);
+	auto cookie = xcb_get_property(xc, 0, listeners->wlr_surface->window_id, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
+	auto reply = xcb_get_property_reply(xc, cookie, 0);
+	xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
+	if(xid) wlr_log(WLR_DEBUG, "XCB transient for: %#010x", *xid);
+	else wlr_log(WLR_DEBUG, "XCB transient for: NULL");
+	free(reply);
+	xcb_disconnect(xc);
+
+	*/
 
 }

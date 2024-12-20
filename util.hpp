@@ -12,6 +12,12 @@ inline void spawn(const char* cmd) {
     }
 }
 
+/*
+    UTILITY ZÜG WOS NO BRUCHT
+    [ ] Extend type mit guete util member functions
+    [ ] Ahständigs log system
+*/
+
 //ICH GLAUB DE OPTIONAL POINTER ISCH EN SCHEISS
 
 template <typename T>

@@ -84,6 +84,7 @@ namespace Input {
     }
 
     //SCROLL EVENT
+    //TODO: add touchpad scroll aceleration
     void cursor_axis_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_axis_event *event = (wlr_pointer_axis_event*) data;
         wlr_seat_pointer_notify_axis(seat, event->time_msec, event->orientation, 
