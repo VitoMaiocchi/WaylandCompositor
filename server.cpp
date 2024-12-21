@@ -3,6 +3,7 @@
 #include "output.hpp"
 #include "surface.hpp"
 #include "input.hpp"
+#include "titlebar.hpp"
 
 #define ASSERT_NOTNULL(n, m) if(!n) {   \
     wlr_log(WLR_ERROR, m);              \
@@ -39,6 +40,7 @@ namespace Server {
         Output::setup();        
         Surface::setup();
         Input::setup();
+        Titlebar::setup();
 
 
         //START BACKEND
