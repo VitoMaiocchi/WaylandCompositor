@@ -5,6 +5,9 @@
 
 #include <functional>
 #include <algorithm>
+#include <pulse/pulseaudio.h>
+#include <iostream>
+#include <cmath>
 
 namespace Output {
 
@@ -111,6 +114,9 @@ namespace Output {
 		wl_signal_add(&wlr_output->events.destroy, &listeners->destroy);
 	}
 
+	void setupPulseAudio();
+	void cleanupPulseAudio();
+
     void setup() {
         output_layout = wlr_output_layout_create(Server::display);
 
@@ -119,11 +125,15 @@ namespace Output {
 
         scene = wlr_scene_create();
         scene_layout = wlr_scene_attach_output_layout(scene, output_layout);
+
+		setupPulseAudio();
     }
 
     void cleanup() {
         wlr_scene_node_destroy(&scene->tree.node);
         wlr_output_layout_destroy(output_layout);
+
+		cleanupPulseAudio();
     }
 
 	//MONITOR END
@@ -208,5 +218,59 @@ namespace Output {
 		cairo_destroy(cr);
 		wlr_scene_buffer_set_buffer(scene_buffer, &buffer->base);
 		wlr_buffer_drop(&buffer->base);
+	}
+
+	pa_threaded_mainloop* mainloop;
+	pa_context* context;
+	pa_volume_t current_volume = PA_VOLUME_INVALID;
+
+	void synchronized_volume_update(void* data) {
+		const pa_volume_t volume = *(pa_volume_t*)data;
+		delete (pa_volume_t*)data;
+
+		const uint vol_percent = std::round( (float)volume*100/PA_VOLUME_NORM );
+		Titlebar::updateVolume(vol_percent);
+	}
+
+	//TODO: add support for mute
+	void get_sink_volume_callback(pa_context *c, const pa_sink_info *i, int is_last, void *userdata) {
+		if(is_last) return;
+		assert(i);
+		const pa_volume_t volume = pa_cvolume_avg(&i->volume);
+		if(volume == current_volume) return;
+		current_volume = volume;
+		Server::queueEvent(synchronized_volume_update, new pa_volume_t(current_volume));
+	}
+
+
+	void subscribe_callback(pa_context *c, pa_subscription_event_type_t t, uint32_t index, void *userdata) {
+		if ((t & PA_SUBSCRIPTION_EVENT_FACILITY_MASK) == PA_SUBSCRIPTION_EVENT_SINK &&
+			(t & PA_SUBSCRIPTION_EVENT_TYPE_MASK) == PA_SUBSCRIPTION_EVENT_CHANGE) {
+			pa_context_get_sink_info_by_name(c, "@DEFAULT_SINK@", get_sink_volume_callback, nullptr);
+		}
+	}
+
+	void setupPulseAudio() {
+		mainloop = pa_threaded_mainloop_new();
+		pa_mainloop_api *mainloop_api = pa_threaded_mainloop_get_api(mainloop);
+		context = pa_context_new(mainloop_api, "Vito Manager");
+		pa_context_connect(context, nullptr, PA_CONTEXT_NOAUTOSPAWN, nullptr);
+
+		pa_context_set_state_callback(context, [](pa_context *c, void *userdata) {
+			if (pa_context_get_state(c) == PA_CONTEXT_READY) {
+				std::cout << "PULSE READY" << std::endl;
+				pa_context_get_sink_info_by_name(c, "@DEFAULT_SINK@", get_sink_volume_callback, nullptr);
+				pa_context_set_subscribe_callback(c, subscribe_callback, nullptr);
+				pa_context_subscribe(c, PA_SUBSCRIPTION_MASK_SINK, nullptr, nullptr);
+			}
+		}, nullptr);
+
+		pa_threaded_mainloop_start(mainloop);
+	}
+
+	void cleanupPulseAudio() {
+		pa_context_unref(context);
+		pa_threaded_mainloop_stop(mainloop);
+		pa_threaded_mainloop_free(mainloop);
 	}
 }

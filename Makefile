@@ -8,7 +8,8 @@ LIBS=-L/usr/lib \
 	 $(shell pkg-config --cflags --libs wayland-server) \
 	 $(shell pkg-config --cflags --libs xkbcommon) \
 	 $(shell pkg-config --cflags --libs cairo) \
-	 $(shell pkg-config --cflags --libs xcb)
+	 $(shell pkg-config --cflags --libs xcb) \
+	 $(shell pkg-config --cflags --libs libpulse)
 
 FLAGS=$(CFLAGS) -g -O0 -Wall -I/usr/include/pixman-1 -I. -I/usr/include/wlroots-0.18 -DWLR_USE_UNSTABLE
 

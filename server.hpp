@@ -2,6 +2,8 @@
 
 #include "includes.hpp"
 
+#include <functional>
+
 namespace Server {
 
     extern wl_display* display;
@@ -10,5 +12,8 @@ namespace Server {
 	extern wlr_allocator* allocator;
     extern wlr_compositor* compositor;
 
+    typedef std::function<void(void* data)> EventCallback;
+
     bool setup();
+    void queueEvent(EventCallback callback, void* data);
 }

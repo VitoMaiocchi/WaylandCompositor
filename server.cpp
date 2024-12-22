@@ -5,6 +5,11 @@
 #include "input.hpp"
 #include "titlebar.hpp"
 
+#include <queue>
+#include <mutex>
+#include <iostream>
+#include <chrono>
+
 #define ASSERT_NOTNULL(n, m) if(!n) {   \
     wlr_log(WLR_ERROR, m);              \
     return 1;                           \
@@ -17,8 +22,10 @@ namespace Server {
 	wlr_allocator* allocator;
     wlr_compositor* compositor;
 
+    void dispatchEvents();
+
     bool setup() {
-        wlr_log_init(WLR_DEBUG, NULL);
+        wlr_log_init(WLR_ERROR, NULL);
         display = wl_display_create();
 
         backend = wlr_backend_autocreate(wl_display_get_event_loop(display), NULL);
@@ -58,17 +65,55 @@ namespace Server {
 
         setenv("WAYLAND_DISPLAY", socket, true);
 
+        wlr_log_init(WLR_DEBUG, NULL);
+
         /* Run the Wayland event loop. This does not return until you exit the
         * compositor. Starting the backend rigged up all of the necessary event
         * loop configuration to listen to libinput events, DRM events, generate
         * frame events at the refresh rate, and so on. */
         wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s", socket);
-        wl_display_run(display);
+        wl_event_loop* event_loop = wl_display_get_event_loop(display);
+
+        auto last = std::chrono::steady_clock::now();
+
+        //TODO: move loop to main.cpp and add SIGINT
+        while (true) {
+            wl_display_flush_clients(display);
+            if (wl_event_loop_dispatch(event_loop, 50) < 0) break;
+            dispatchEvents();
+            auto now = std::chrono::steady_clock::now();
+            //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last);
+            last = now;
+        }
 
         wl_display_destroy_clients(display);
         Output::cleanup();
         Input::cleanup();
         wl_display_destroy(display);
         return 0;
+    }
+
+    struct Event {
+        EventCallback callback;
+        void* data;
+    };
+
+    std::queue<Event> eventQueue;
+    std::mutex eventQueueMut;
+
+    void dispatchEvents() {
+        eventQueueMut.lock();
+        while(!eventQueue.empty()) {
+            Event &event = eventQueue.front();
+            event.callback(event.data);
+            eventQueue.pop();
+        }
+        eventQueueMut.unlock();
+    }
+
+    void queueEvent(EventCallback callback, void* data) {
+        eventQueueMut.lock();
+        eventQueue.push({callback, data});
+        eventQueueMut.unlock();
     }
 }

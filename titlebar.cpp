@@ -16,10 +16,16 @@ std::string getBatteryStatus();
 std::list<Titlebar*> titlebars;
 std::string current_time = "";
 std::string battery_status = "";
+std::string volume = "";
 
 bool has_bat = false;
 std::string ac_path = "";
 std::string bat_path = "";
+
+void Titlebar::updateVolume(uint volume_percent) {
+    volume = "Volume: "+std::to_string(volume_percent)+"%";
+    for(Titlebar* titlebar : titlebars) titlebar->drawBuffer();
+}
 
 int Titlebar::update_titlebars(void* data) {
     current_time = getCurrentTimeAndDate();
@@ -79,7 +85,7 @@ void draw(cairo_t* cr, uint desktop) {
 	cairo_set_font_size (cr, 20.0);
 
     std::string text = current_time +"   Desktop: "+ std::to_string(desktop+1)+
-        "   "+battery_status;
+        "   "+battery_status + "   "+volume;
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_move_to (cr, 20.0, 25.0);

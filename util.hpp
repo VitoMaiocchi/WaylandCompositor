@@ -15,7 +15,7 @@ inline void spawn(const char* cmd) {
 /*
     UTILITY ZÜG WOS NO BRUCHT
     [ ] Extend type mit guete util member functions
-    [ ] Ahständigs log system
+    [ ] Ahständigs log system (mit std::format)
 */
 
 //ICH GLAUB DE OPTIONAL POINTER ISCH EN SCHEISS
