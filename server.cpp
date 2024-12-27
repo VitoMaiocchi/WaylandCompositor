@@ -21,6 +21,7 @@ namespace Server {
     wlr_renderer* renderer;
 	wlr_allocator* allocator;
     wlr_compositor* compositor;
+    bool connected = false;
 
     void dispatchEvents();
 
@@ -77,7 +78,8 @@ namespace Server {
         auto last = std::chrono::steady_clock::now();
 
         //TODO: move loop to main.cpp and add SIGINT
-        while (true) {
+        connected = true;
+        while (connected) {
             wl_display_flush_clients(display);
             if (wl_event_loop_dispatch(event_loop, 50) < 0) break;
             dispatchEvents();

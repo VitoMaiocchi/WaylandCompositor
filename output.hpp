@@ -27,4 +27,6 @@ namespace Output {
             wlr_scene_buffer* scene_buffer;
     };
 
+    //value must be between -1 and 1
+    void adjustVolume(double vol);
 }

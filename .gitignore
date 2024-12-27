@@ -4,3 +4,4 @@ VitoWM
 .vscode
 *.o
 log.txt
+backtrace.txt

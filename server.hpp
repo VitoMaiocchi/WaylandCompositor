@@ -11,6 +11,7 @@ namespace Server {
     extern wlr_renderer* renderer;
 	extern wlr_allocator* allocator;
     extern wlr_compositor* compositor;
+    extern bool connected;
 
     typedef std::function<void(void* data)> EventCallback;
 

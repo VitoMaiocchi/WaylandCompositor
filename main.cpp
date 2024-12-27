@@ -16,10 +16,18 @@ int main() {
 	});
 
 	Input::registerKeyCallback(XKB_KEY_Q, WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT, [](xkb_keysym_t sym, uint32_t modmask){
-		wl_display_terminate(Server::display);
+		Server::connected = false;
 	});
 
 	for(xkb_keysym_t key = XKB_KEY_1; key <= XKB_KEY_9; key++) Input::registerKeyCallback(key, WLR_MODIFIER_LOGO, change_desktop);
+
+	Input::registerKeyCallback(XKB_KEY_XF86AudioRaiseVolume, 0, [](xkb_keysym_t sym, uint32_t modmask){
+		Output::adjustVolume(0.02);
+	});
+
+	Input::registerKeyCallback(XKB_KEY_XF86AudioLowerVolume, 0, [](xkb_keysym_t sym, uint32_t modmask){
+		Output::adjustVolume(-0.02);
+	});
 
 	Server::setup();
 }

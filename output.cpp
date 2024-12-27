@@ -8,6 +8,7 @@
 #include <pulse/pulseaudio.h>
 #include <iostream>
 #include <cmath>
+#include <atomic>
 
 namespace Output {
 
@@ -224,6 +225,34 @@ namespace Output {
 	pa_context* context;
 	pa_volume_t current_volume = PA_VOLUME_INVALID;
 
+	std::atomic<bool> connected = false;
+	const pa_sink_info* default_sink = nullptr;
+
+	void adjustVolume(double vol) {
+		assert(vol < 1 && vol > -1);
+		if(!connected) return;
+
+		pa_threaded_mainloop_lock(mainloop);
+
+		pa_cvolume new_vol;
+		new_vol.channels = default_sink->volume.channels;
+		for(uint i = 0; i < default_sink->volume.channels; i++) {
+			pa_volume_t o = default_sink->volume.values[i];
+			pa_volume_t n;
+			if(vol > 0) {
+				if(o + PA_VOLUME_NORM*vol > PA_VOLUME_NORM) n = PA_VOLUME_NORM;
+				else n = o + PA_VOLUME_NORM*vol;
+			} else {
+				if(o < PA_VOLUME_NORM*(-vol)) n = 0;
+				else n = o - PA_VOLUME_NORM*(-vol);
+			}
+			new_vol.values[i] = n;
+		}
+		pa_context_set_sink_volume_by_index(context, default_sink->index, &new_vol, nullptr, nullptr);
+		//TODO: das mit by name und nöd by index mache den muss mer de sink nöd speichere pa_context_set_sink_volume_by_name()
+		pa_threaded_mainloop_unlock(mainloop);
+	}
+
 	void synchronized_volume_update(void* data) {
 		const pa_volume_t volume = *(pa_volume_t*)data;
 		delete (pa_volume_t*)data;
@@ -236,6 +265,7 @@ namespace Output {
 	void get_sink_volume_callback(pa_context *c, const pa_sink_info *i, int is_last, void *userdata) {
 		if(is_last) return;
 		assert(i);
+		default_sink = i;
 		const pa_volume_t volume = pa_cvolume_avg(&i->volume);
 		if(volume == current_volume) return;
 		current_volume = volume;
@@ -258,6 +288,7 @@ namespace Output {
 
 		pa_context_set_state_callback(context, [](pa_context *c, void *userdata) {
 			if (pa_context_get_state(c) == PA_CONTEXT_READY) {
+				connected = true;
 				std::cout << "PULSE READY" << std::endl;
 				pa_context_get_sink_info_by_name(c, "@DEFAULT_SINK@", get_sink_volume_callback, nullptr);
 				pa_context_set_subscribe_callback(c, subscribe_callback, nullptr);
@@ -269,6 +300,7 @@ namespace Output {
 	}
 
 	void cleanupPulseAudio() {
+		connected = false;
 		pa_context_unref(context);
 		pa_threaded_mainloop_stop(mainloop);
 		pa_threaded_mainloop_free(mainloop);
