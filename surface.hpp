@@ -3,6 +3,7 @@
 #include "includes.hpp"
 #include "util.hpp"
 #include <utility>
+#include <set>
 
 namespace Surface {
     class Base {
@@ -22,6 +23,8 @@ namespace Surface {
         virtual void extendsUpdateNotify(bool resize) = 0;
     };
 
+    class Child;
+
     class Toplevel : public Base {
         public:
         Toplevel();
@@ -30,6 +33,10 @@ namespace Surface {
         void setFocus(bool focus);
         void setVisibility(bool visible);
         std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
+
+        wlr_scene_tree* addChild(Child* child);
+        void removeChild(Child* child);
+        void setChildExtends(Extends* ext);
 
         protected:
         virtual void setSurfaceSize(uint width, uint height) = 0;
@@ -52,6 +59,9 @@ namespace Surface {
         bool mapped;
         bool minimized;
         bool fullscreen;
+
+        std::set<Child*> children;
+        Extends* child_ext;
     };
 
     void setup();

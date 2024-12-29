@@ -27,6 +27,49 @@ namespace Surface {
 		extendsUpdateNotify(resize);
 	}
 
+	//any child surface of a toplevel (probably only popups)
+	class Child : public Base {
+		protected:
+		Toplevel* parent;
+
+		public:
+		const Extends idealExt;
+
+		Child(Toplevel* parent, const Extends &idealExt) : parent(parent), idealExt(idealExt) {}
+		virtual ~Child() = default;
+	};
+
+	//aranges child surfaces within the space that is available
+	void arrangeChildren(Extends ext, std::set<Child*> &children) {
+		//FIXME: make this not suck (currently it does not consider available space)
+		for(auto c : children) c->setExtends(c->idealExt);
+	}
+
+	//TODO: make this extends member function
+	inline Extends transform(Extends ext, Extends parent) {
+		ext.x -= parent.x;
+		ext.y -= parent.y;
+		return ext;
+	}
+
+	wlr_scene_tree* Toplevel::addChild(Child* child) {
+		children.insert(child);
+		arrangeChildren(transform(*child_ext, extends), children);
+		return root_node;
+	}
+
+    void Toplevel::removeChild(Child* child) {
+		auto it = children.find(child);
+		assert(it != children.end()); //can not remove a child that has not been added
+		children.erase(child);
+		arrangeChildren(transform(*child_ext, extends), children);
+	}
+
+	void Toplevel::setChildExtends(Extends* ext) {
+		child_ext = ext;
+		arrangeChildren(transform(*child_ext, extends), children);
+	}
+
 	//TOPLEVEL
 	Toplevel::Toplevel() {
 		for(uint i = 0; i < 4; i++) border[i] = NULL;
@@ -143,10 +186,9 @@ namespace Surface {
         XdgToplevel(wlr_xdg_toplevel* xdg_toplevel) {
 			debug("TOPLEVEL SURFACE");
 			this->xdg_toplevel = xdg_toplevel;
+			xdg_toplevel->base->surface->data = this;
 			root_node = wlr_scene_tree_create(&Output::scene->tree);
 			surface_node = wlr_scene_xdg_surface_create(root_node, xdg_toplevel->base);
-
-			xdg_toplevel->base->surface->data = root_node; //TEMPORARY
 		}
 
         ~XdgToplevel() {
@@ -177,7 +219,6 @@ namespace Surface {
 		wlr_xdg_toplevel* xdg_toplevel = (wlr_xdg_toplevel*) data;
 		xdg_shell_surface_listeners* listeners = new xdg_shell_surface_listeners();
 		listeners->surface = new XdgToplevel(xdg_toplevel);
-		//xdg_toplevel->base->surface->data = listeners->surface; TODO: Popup mit surface
 		wlr_log(WLR_DEBUG, "new xdg toplevel %p", listeners->surface);
 
 				//CONFIGURE LISTENERS
@@ -210,21 +251,53 @@ namespace Surface {
 		wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&listeners->destroy_listener);
 	}
 
+	class XdgPopup : public Child {
+		wlr_xdg_popup* popup;
+		wlr_scene_tree* scene_tree;
+
+		public:
+		XdgPopup(wlr_xdg_popup* popup) : Child((XdgToplevel*)popup->parent->data, popup->scheduled.geometry), popup(popup) {
+			const auto parent_scene_tree = parent->addChild(this);
+			scene_tree = wlr_scene_xdg_surface_create(parent_scene_tree, popup->base);
+			popup->base->surface->data = parent; //alli sind child form main parent
+		}
+
+		~XdgPopup() {
+			parent->removeChild(this);
+			wlr_scene_node_destroy(&scene_tree->node);
+		}
+
+		void setFocus(bool focus) {}
+        wlr_surface* getSurface() {return nullptr;}
+        std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {return {0,0};}
+        void extendsUpdateNotify(bool resize) {
+			popup->scheduled.geometry = extends;
+			wlr_xdg_surface_schedule_configure(popup->base);
+		}
+	};
+
+	struct xdg_popup_listeners {
+		XdgPopup* popup;
+		wl_listener destroy;
+	};
+
 	void new_xdg_popup_notify(struct wl_listener* listener, void* data) {
 		wlr_xdg_popup* xdg_popup = (wlr_xdg_popup*) data;
-		if(!xdg_popup->parent) {
+		if(!xdg_popup->parent) { //maybe make this assert idk
 			wlr_log(WLR_DEBUG, "XDG toplevel new popup: no parent");
 			return;
 		}
-
 		wlr_log(WLR_DEBUG, "XDG toplevel new popup with parent: %p", xdg_popup->parent);
 
-		//FIXME: porbably memory leak but placeholder so I don't care
-		auto root_node = wlr_scene_xdg_surface_create((wlr_scene_tree*) xdg_popup->parent->data, xdg_popup->base);
-		xdg_popup->base->surface->data = root_node;
-		wlr_xdg_surface_schedule_configure(xdg_popup->base);
+		xdg_popup_listeners* listeners = new xdg_popup_listeners();
+		listeners->popup = new XdgPopup(xdg_popup);
+		listeners->destroy.notify = [](wl_listener* listener, void* data) {
+			xdg_popup_listeners* listeners = wl_container_of(listener, listeners, destroy);
+			delete listeners->popup;
+			delete listeners;
+		};
 
-		//TODO create xdg popup
+		wl_signal_add(&xdg_popup->events.destroy, &listeners->destroy);
 	}
 
 	void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
