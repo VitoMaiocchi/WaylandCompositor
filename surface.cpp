@@ -38,13 +38,11 @@ namespace Surface {
 
 		Child(Parent* parent, const Extends &idealExt) : parent(parent), idealExt(idealExt) {}
 		virtual ~Child() = default;
+		virtual void arrange(Extends ext) = 0; //extends of available space
+		void arrangeAll() {
+			parent->arrangeAll();
+		}
 	};
-
-	//aranges child surfaces within the space that is available
-	void arrangeChildren(Extends ext, std::set<Child*> &children) {
-		//FIXME: make this not suck (currently it does not consider available space)
-		for(auto c : children) c->setExtends(c->idealExt);
-	}
 
 	//TODO: make this extends member function
 	inline Extends transform(Extends ext, Extends parent) {
@@ -53,10 +51,22 @@ namespace Surface {
 		return ext;
 	}
 
+	void Parent::arrangeChildren(Extends ext) {
+		ext = transform(ext, extends);
+		for(Child* c : children) {
+			c->arrange(ext);
+			c->arrangeChildren(ext);
+		}
+	}
+
+	void Toplevel::arrangeAll() {
+		arrangeChildren(*child_ext);
+	}
+
 	wlr_scene_tree* Parent::addChild(Child* child) {
-		child->setChildExtends(child_ext);
 		children.insert(child);
-		arrangeChildren(transform(*child_ext, extends), children);
+		//this is not the most efficient and elegant solution but its good enough for now
+		arrangeAll();
 		return root_node;
 	}
 
@@ -64,13 +74,11 @@ namespace Surface {
 		auto it = children.find(child);
 		assert(it != children.end()); //can not remove a child that has not been added
 		children.erase(child);
-		arrangeChildren(transform(*child_ext, extends), children);
 	}
 
-	void Parent::setChildExtends(Extends* ext) {
+	void Toplevel::setChildExtends(Extends* ext) {
 		child_ext = ext;
-		for(auto c : children) c->setChildExtends(ext);
-		arrangeChildren(transform(*child_ext, extends), children);
+		arrangeAll();
 	}
 
 	//TOPLEVEL
@@ -79,6 +87,7 @@ namespace Surface {
 		extends = {0,0,0,0};
 		visible = false;
 		focused = false;
+		child_ext = &extends;
 	}
 	
 	void Toplevel::setFocus(bool focus) {
@@ -255,6 +264,19 @@ namespace Surface {
 		wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&listeners->destroy_listener);
 	}
 
+	//TODO: Extends helper in util
+	inline Extends constrain(Extends e, Extends c) {
+		if(e.height > c.height) e.height = c.height;
+		if(e.width > c.width) e.width = c.width;
+
+		if(e.x + e.width > c.x + c.width) e.x = c.x + c.width - e.width;
+		else if(e.x < c.x) e.x = c.x;
+
+		if(e.y + e.height > c.y + c.height) e.y = c.y + c.height - e.height;
+		else if(e.y < c.y) e.y = c.y;
+		return e;
+	}
+
 	class XdgPopup : public Child {
 		wlr_xdg_popup* popup;
 
@@ -270,18 +292,29 @@ namespace Surface {
 			wlr_scene_node_destroy(&root_node->node);
 		}
 
-		void setFocus(bool focus) {}
-        wlr_surface* getSurface() {return nullptr;}
-        std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {return {0,0};}
-        void extendsUpdateNotify(bool resize) {
+		void arrange(Extends ext) {
+			extends = constrain(popup->scheduled.geometry, ext);
+		}
+
+		void position() {
+			//FIXME: for a few ms the original postion shows up
+			//		 idk if this is fixable without replacing wlroots
 			popup->scheduled.geometry = extends;
 			wlr_xdg_surface_schedule_configure(popup->base);
 		}
+
+		//TODO: restructure inheritance: das züg bruchts alles nöd
+		void setFocus(bool focus) {}
+        wlr_surface* getSurface() {return nullptr;}
+        std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {return {0,0};}
+        void extendsUpdateNotify(bool resize) {}
 	};
 
 	struct xdg_popup_listeners {
-		XdgPopup* popup;
+		XdgPopup* popup = nullptr;
 		wl_listener destroy;
+		wl_listener reposition;
+		wl_listener commit;
 	};
 
 	void new_xdg_popup_notify(struct wl_listener* listener, void* data) {
@@ -294,13 +327,29 @@ namespace Surface {
 
 		xdg_popup_listeners* listeners = new xdg_popup_listeners();
 		listeners->popup = new XdgPopup(xdg_popup);
+		
 		listeners->destroy.notify = [](wl_listener* listener, void* data) {
 			xdg_popup_listeners* listeners = wl_container_of(listener, listeners, destroy);
+			// FIXME: this crashes idk why
+			// wl_list_remove(&listeners->destroy.link);
+			// wl_list_remove(&listeners->reposition.link);
+			// wl_list_remove(&listeners->commit.link);
 			delete listeners->popup;
 			delete listeners;
 		};
-
 		wl_signal_add(&xdg_popup->events.destroy, &listeners->destroy);
+
+		listeners->reposition.notify = [](wl_listener* listener, void* data) {
+			xdg_popup_listeners* listeners = wl_container_of(listener, listeners, reposition);
+			listeners->popup->position();
+		};
+		wl_signal_add(&xdg_popup->events.destroy, &listeners->destroy);
+
+		listeners->commit.notify = [](wl_listener* listener, void* data) {
+			xdg_popup_listeners* listeners = wl_container_of(listener, listeners, commit);
+			listeners->popup->position();
+		};
+		wl_signal_add(&xdg_popup->base->surface->events.commit, &listeners->commit);
 	}
 
 	void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
