@@ -46,8 +46,15 @@ class TilingLayout {
         for(auto surface : surfaces) surface->setVisibility(visibility);
     }
 
-    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y) {
-        for(auto s : surfaces) if(s->contains(x,y)) return s;
+    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y, Surface::Toplevel* include_children) {
+        if(include_children) {
+            auto it = std::find(surfaces.begin(), surfaces.end(), include_children);
+            assert(it != surfaces.end());
+            if((*it)->contains(x,y,true)) return include_children; 
+        }
+
+        //it checks include_children twice but I can live with that
+        for(auto s : surfaces) if(s->contains(x,y, false)) return s;
         return nullptr;
     }
 
@@ -134,8 +141,9 @@ class Desktop {
         tilingLayout.updateLayout(extends);
     }
 
-    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y) {
-        return tilingLayout.getSurfaceAtLocation(x,y);
+    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y, bool include_children) {
+        if(include_children) return tilingLayout.getSurfaceAtLocation(x,y, focused_toplevel);
+        return tilingLayout.getSurfaceAtLocation(x,y, nullptr);
     }
 };
 
@@ -184,7 +192,7 @@ class Display {
     }
 
     void handleCursorMovement(const double x, const double y) {
-        const auto surface = desktops[current_desktop].getSurfaceAtLocation(x,y);
+        const auto surface = desktops[current_desktop].getSurfaceAtLocation(x,y, true);
         desktops[current_desktop].setFocusedSurface(surface);
         Input::setCursorFocus(surface);
     }

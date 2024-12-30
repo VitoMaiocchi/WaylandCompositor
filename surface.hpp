@@ -33,6 +33,8 @@ namespace Surface {
         void removeChild(Child* child);
         void arrangeChildren(Extends ext);
         virtual void arrangeAll() = 0;
+        bool contains(int x, int y, bool include_children);
+        using Base::contains;
     };
 
     class Toplevel : public Parent {

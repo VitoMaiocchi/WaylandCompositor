@@ -76,6 +76,15 @@ namespace Surface {
 		children.erase(child);
 	}
 
+	bool Parent::contains(int x, int y, bool include_children) {
+		if(!include_children) return Base::contains(x,y);
+		if(Base::contains(x,y)) return true;
+		x -= extends.x;
+		y -= extends.y;
+		for(auto c : children) if(c->contains(x,y,true)) return true;
+		return false;
+	}
+
 	void Toplevel::setChildExtends(Extends* ext) {
 		child_ext = ext;
 		arrangeAll();
@@ -105,8 +114,8 @@ namespace Surface {
 		}
 
 		for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_active);
-
 		Input::setKeyboardFocus(this);
+		wlr_scene_node_raise_to_top(&root_node->node);
 	}
 
 	void Toplevel::setVisibility(bool visible) {
@@ -137,7 +146,10 @@ namespace Surface {
 		}
 
 		setActivated(focused);
-		if(focused) Input::setKeyboardFocus(this);
+		if(focused) {
+			Input::setKeyboardFocus(this);
+			wlr_scene_node_raise_to_top(&root_node->node);
+		}
 	}
 
 	std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) const {
