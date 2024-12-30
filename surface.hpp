@@ -25,7 +25,17 @@ namespace Surface {
 
     class Child;
 
-    class Toplevel : public Base {
+    class Parent : public Base{
+        std::set<Child*> children;
+        Extends* child_ext;
+
+        public:
+        wlr_scene_tree* addChild(Child* child);
+        void removeChild(Child* child);
+        void setChildExtends(Extends* ext);
+    };
+
+    class Toplevel : public Parent {
         public:
         Toplevel();
         virtual ~Toplevel() = default;
@@ -33,10 +43,6 @@ namespace Surface {
         void setFocus(bool focus);
         void setVisibility(bool visible);
         std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
-
-        wlr_scene_tree* addChild(Child* child);
-        void removeChild(Child* child);
-        void setChildExtends(Extends* ext);
 
         protected:
         virtual void setSurfaceSize(uint width, uint height) = 0;
@@ -59,9 +65,6 @@ namespace Surface {
         bool mapped;
         bool minimized;
         bool fullscreen;
-
-        std::set<Child*> children;
-        Extends* child_ext;
     };
 
     void setup();

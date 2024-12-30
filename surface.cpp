@@ -28,14 +28,15 @@ namespace Surface {
 	}
 
 	//any child surface of a toplevel (probably only popups)
-	class Child : public Base {
+	//child surfaces can be parents of other children
+	class Child : public Parent {
 		protected:
-		Toplevel* parent;
+		Parent* parent;
 
 		public:
 		const Extends idealExt;
 
-		Child(Toplevel* parent, const Extends &idealExt) : parent(parent), idealExt(idealExt) {}
+		Child(Parent* parent, const Extends &idealExt) : parent(parent), idealExt(idealExt) {}
 		virtual ~Child() = default;
 	};
 
@@ -52,21 +53,23 @@ namespace Surface {
 		return ext;
 	}
 
-	wlr_scene_tree* Toplevel::addChild(Child* child) {
+	wlr_scene_tree* Parent::addChild(Child* child) {
+		child->setChildExtends(child_ext);
 		children.insert(child);
 		arrangeChildren(transform(*child_ext, extends), children);
 		return root_node;
 	}
 
-    void Toplevel::removeChild(Child* child) {
+    void Parent::removeChild(Child* child) {
 		auto it = children.find(child);
 		assert(it != children.end()); //can not remove a child that has not been added
 		children.erase(child);
 		arrangeChildren(transform(*child_ext, extends), children);
 	}
 
-	void Toplevel::setChildExtends(Extends* ext) {
+	void Parent::setChildExtends(Extends* ext) {
 		child_ext = ext;
+		for(auto c : children) c->setChildExtends(ext);
 		arrangeChildren(transform(*child_ext, extends), children);
 	}
 
@@ -152,6 +155,7 @@ namespace Surface {
 
 		//UPDATE WINDOW DECORATION
 		wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+		//TODO: possibly rearrange children
 		if(!resize) return; //the rest only involves resize
 
 		setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
@@ -253,18 +257,17 @@ namespace Surface {
 
 	class XdgPopup : public Child {
 		wlr_xdg_popup* popup;
-		wlr_scene_tree* scene_tree;
 
 		public:
-		XdgPopup(wlr_xdg_popup* popup) : Child((XdgToplevel*)popup->parent->data, popup->scheduled.geometry), popup(popup) {
+		XdgPopup(wlr_xdg_popup* popup) : Child((Parent*)popup->parent->data, popup->scheduled.geometry), popup(popup) {
 			const auto parent_scene_tree = parent->addChild(this);
-			scene_tree = wlr_scene_xdg_surface_create(parent_scene_tree, popup->base);
-			popup->base->surface->data = parent; //alli sind child form main parent
+			root_node = wlr_scene_xdg_surface_create(parent_scene_tree, popup->base);
+			popup->base->surface->data = this;
 		}
 
 		~XdgPopup() {
 			parent->removeChild(this);
-			wlr_scene_node_destroy(&scene_tree->node);
+			wlr_scene_node_destroy(&root_node->node);
 		}
 
 		void setFocus(bool focus) {}
