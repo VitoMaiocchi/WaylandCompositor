@@ -11,6 +11,8 @@
 #include <iostream>
 #include <set>
 
+//TODO: clean all of this up it's horrible
+
 namespace Surface {
 	//BASE CLASS
 	bool Base::contains(int x, int y) {
@@ -34,9 +36,7 @@ namespace Surface {
 		Parent* parent;
 
 		public:
-		const Extends idealExt;
-
-		Child(Parent* parent, const Extends &idealExt) : parent(parent), idealExt(idealExt) {}
+		Child(Parent* parent) : parent(parent) {}
 		virtual ~Child() = default;
 		virtual void arrange(Extends ext) = 0; //extends of available space
 		void arrangeAll() {
@@ -293,7 +293,7 @@ namespace Surface {
 		wlr_xdg_popup* popup;
 
 		public:
-		XdgPopup(wlr_xdg_popup* popup) : Child((Parent*)popup->parent->data, popup->scheduled.geometry), popup(popup) {
+		XdgPopup(wlr_xdg_popup* popup) : Child((Parent*)popup->parent->data), popup(popup) {
 			const auto parent_scene_tree = parent->addChild(this);
 			root_node = wlr_scene_xdg_surface_create(parent_scene_tree, popup->base);
 			popup->base->surface->data = this;
@@ -377,8 +377,7 @@ namespace Surface {
         XwaylandToplevel(wlr_xwayland_surface* xwayland_surface) {
 			this->xwayland_surface = xwayland_surface;
 			root_node = wlr_scene_tree_create(&Output::scene->tree);
-
-			xwayland_surface->data = root_node; //TEMPORARY
+			xwayland_surface->data = this;
 		}
 
 		void map(bool map) {
@@ -405,6 +404,52 @@ namespace Surface {
 
     };
 
+	//TODO: all this stuff is ugly and placeholder
+	xcb_window_t getLeader(xcb_window_t window);
+	std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
+
+	class XwaylandPopup : public Child {
+		wlr_xwayland_surface* popup;
+
+		static Parent* getParent(wlr_xwayland_surface* surface) {
+			Parent* parent = (Parent*) surface->parent->data;
+			if(!parent) {
+				//the parent can sometimes be a unassocied suface
+				auto leader = getLeader(surface->parent->window_id);
+				assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
+				parent = (Parent*) fallbackToplevels[leader]->data;
+			}
+			return parent;
+		}
+
+		public:
+		XwaylandPopup(wlr_xwayland_surface* popup_surface) : Child(getParent(popup_surface)), popup(popup_surface) {
+			const auto parent_scene_tree = parent->addChild(this);
+			root_node = wlr_scene_subsurface_tree_create(parent_scene_tree, popup->surface);
+			popup->data = this; //das bruchts da wahrschinlich gar nöd
+
+			wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+			wlr_xwayland_surface_configure(popup, extends.x, extends.y, extends.width, extends.height);
+		}
+
+		~XwaylandPopup() {
+			parent->removeChild(this);
+			wlr_scene_node_destroy(&root_node->node);
+		}
+
+		void arrange(Extends ext) {
+			auto size = popup->size_hints;
+			extends = constrain({size->x, size->y, size->width, size->height}, ext);
+		}
+
+
+		//TODO: restructure inheritance: das züg bruchts alles nöd
+		void setFocus(bool focus) {}
+        wlr_surface* getSurface() {return nullptr;}
+        std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {return {0,0};}
+        void extendsUpdateNotify(bool resize) {}
+	};
+
 	wlr_xwayland* xwayland;
 	wl_listener new_xwayland_surface;
 	wl_listener xwayland_ready_listener;
@@ -420,6 +465,7 @@ namespace Surface {
 	struct xwayland_surface_listeners {
 		union {
 			XwaylandToplevel* surface;
+			XwaylandPopup* popup_surface;
 		};
 		wl_listener map;
 		wl_listener associate;
@@ -437,10 +483,6 @@ namespace Surface {
 			surface->map(true);
 		}
 	};
-
-	//TODO: all this stuff is ugly and placeholder
-	xcb_window_t getLeader(xcb_window_t window);
-	std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
 
 	void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
 		wlr_log(WLR_DEBUG, "NEW XWAYLAND SURFACE NOTIFY: %p", data);
@@ -469,22 +511,7 @@ namespace Surface {
 				break;
 				case XWAYLAND_POPUP:
 					wlr_log(WLR_DEBUG, "new Xwayland popup: %p", listeners->wlr_surface);
-					{
-					//TODO das nöd scheisse une mit base surface inheritance und so
-					wlr_scene_tree* parent = (wlr_scene_tree*) listeners->wlr_surface->parent->data;
-					if(!parent) {
-						//the parent can sometimes be a unassocied suface
-						auto leader = getLeader(listeners->wlr_surface->parent->window_id);
-						assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
-						parent = (wlr_scene_tree*) fallbackToplevels[leader]->data;
-					}
-
-					auto size = listeners->wlr_surface->size_hints;
-					wlr_scene_tree* root_node = wlr_scene_subsurface_tree_create(parent, listeners->wlr_surface->surface);
-					listeners->wlr_surface->data = root_node;
-					wlr_scene_node_set_position(&root_node->node, size->x, size->y);
-					wlr_xwayland_surface_configure(listeners->wlr_surface, size->x, size->y, size->width, size->height);
-					}
+					listeners->popup_surface = new XwaylandPopup(listeners->wlr_surface);
 				break;
 				default:
 				debug("xwayland surface of unknown type");
@@ -542,7 +569,7 @@ namespace Surface {
 				break;
 				case XWAYLAND_POPUP:
 					debug("destroy xwayland popup");
-					//TODO
+					delete listeners->popup_surface;
 				break;
 				default:
 				debug("xwayland surface of unknown type");
