@@ -25,8 +25,14 @@ namespace Server {
 
     void dispatchEvents();
 
+    void wlr_log_callback(enum wlr_log_importance importance, const char *fmt, va_list args) {
+        //this is for debug purposes. It makes the program crash on wlr error. for easy bracktrace
+        if(importance == WLR_ERROR) throw std::runtime_error("WLR ERROR: " + std::string(fmt));
+    }
+
     bool setup() {
         wlr_log_init(WLR_ERROR, NULL);
+        //wlr_log_init(WLR_ERROR, wlr_log_callback);
         display = wl_display_create();
 
         backend = wlr_backend_autocreate(wl_display_get_event_loop(display), NULL);
@@ -66,7 +72,7 @@ namespace Server {
 
         setenv("WAYLAND_DISPLAY", socket, true);
 
-        //wlr_log_init(WLR_DEBUG, NULL);
+        wlr_log_init(WLR_DEBUG, NULL);
 
         /* Run the Wayland event loop. This does not return until you exit the
         * compositor. Starting the backend rigged up all of the necessary event

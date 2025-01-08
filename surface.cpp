@@ -235,15 +235,19 @@ namespace Surface {
 	struct xdg_shell_surface_listeners {
 		XdgToplevel* surface;
 
-		struct wl_listener map_listener;
-		struct wl_listener unmap_listener;
-		struct wl_listener destroy_listener;
+		wl_listener map_listener;
+		wl_listener unmap_listener;
+		wl_listener destroy_listener;
+		wl_listener commit;
+
+		wlr_xdg_toplevel* xdg_toplevel;
 	};
 
 	void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
 		debug("NEW XDG TOPLEVEL NOTIFY");
 		wlr_xdg_toplevel* xdg_toplevel = (wlr_xdg_toplevel*) data;
 		xdg_shell_surface_listeners* listeners = new xdg_shell_surface_listeners();
+		listeners->xdg_toplevel = xdg_toplevel;
 		listeners->surface = new XdgToplevel(xdg_toplevel);
 		wlr_log(WLR_DEBUG, "new xdg toplevel %p", listeners->surface);
 
@@ -275,6 +279,24 @@ namespace Surface {
 		wl_signal_add(&xdg_toplevel->base->surface->events.map, 		&listeners->map_listener);
 		wl_signal_add(&xdg_toplevel->base->surface->events.unmap, 		&listeners->unmap_listener);
 		wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&listeners->destroy_listener);
+
+		listeners->commit.notify = [](struct wl_listener* listener, void* data) {
+			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, commit);
+			wlr_xdg_toplevel* toplevel = listeners->xdg_toplevel;
+
+			if(!toplevel->base->initial_commit) return;
+			assert(toplevel->base->initialized);
+
+			wlr_xdg_toplevel_decoration_v1* dec = (wlr_xdg_toplevel_decoration_v1*) toplevel->base->data;
+			dec->scheduled_mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
+			wlr_xdg_surface_schedule_configure(toplevel->base);
+		};
+		wl_signal_add(&xdg_toplevel->base->surface->events.commit, 	&listeners->commit);
+	}
+
+	void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
+		struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
+		dec->toplevel->base->data = dec;
 	}
 
 	//TODO: Extends helper in util
@@ -366,10 +388,6 @@ namespace Surface {
 		wl_signal_add(&xdg_popup->base->surface->events.commit, &listeners->commit);
 	}
 
-	void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
-		struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
-		wlr_xdg_toplevel_decoration_v1_set_mode(dec, WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
-	}
 
 	//XWAYLAND
 	class XwaylandToplevel : public Toplevel {
