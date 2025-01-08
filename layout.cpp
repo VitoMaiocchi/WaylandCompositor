@@ -125,11 +125,15 @@ class Desktop {
         focused = focus;
         if(!focused_toplevel) {
             auto it = tilingLayout.begin();
-            if(it == tilingLayout.end()) return;
+            if(it == tilingLayout.end()) {
+                Input::setCursorFocus(nullptr);
+                return;
+            }
             focused_toplevel = *it;
         }
 
         focused_toplevel->setFocus(focus);
+        Input::setCursorFocus(focused_toplevel);
     }
 
     void setVisibility(bool visibility) {

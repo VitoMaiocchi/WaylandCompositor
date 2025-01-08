@@ -83,6 +83,8 @@ namespace Server {
 
         auto last = std::chrono::steady_clock::now();
 
+        Input::setCursorFocus(nullptr);
+
         //TODO: move loop to main.cpp and add SIGINT
         connected = true;
         while (connected) {

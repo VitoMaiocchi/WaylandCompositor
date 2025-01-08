@@ -44,6 +44,7 @@ namespace Input {
                 wlr_seat_pointer_clear_focus(seat);
                 pointer_focus = NULL;
             }
+            wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
             return;
         }
 
@@ -68,14 +69,12 @@ namespace Input {
         struct wlr_pointer_motion_event *event = (wlr_pointer_motion_event *) data;
         wlr_cursor_move(cursor, &event->pointer->base, event->delta_x, event->delta_y);
         cursor_process_movement(event->time_msec);
-        wlr_cursor_set_xcursor(cursor, cursor_mgr, "default"); //TODO: di göhret nöd da ane
     }
 
     void cursor_motion_absolute_notify(struct wl_listener *listener, void *data) {
         struct wlr_pointer_motion_absolute_event *event = (wlr_pointer_motion_absolute_event *) data;
         wlr_cursor_warp_absolute(cursor, &event->pointer->base, event->x, event->y);
         cursor_process_movement(event->time_msec);
-        wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
     }
 
     void cursor_button_notify(struct wl_listener *listener, void *data) {
