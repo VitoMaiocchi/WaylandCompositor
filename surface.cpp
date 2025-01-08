@@ -64,6 +64,7 @@ namespace Surface {
 	}
 
 	wlr_scene_tree* Parent::addChild(Child* child) {
+		assert(child);
 		children.insert(child);
 		//this is not the most efficient and elegant solution but its good enough for now
 		arrangeAll();
@@ -300,6 +301,7 @@ namespace Surface {
 		}
 
 		~XdgPopup() {
+			assert(parent);
 			parent->removeChild(this);
 			wlr_scene_node_destroy(&root_node->node);
 		}
@@ -419,6 +421,7 @@ namespace Surface {
 				assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
 				parent = (Parent*) fallbackToplevels[leader]->data;
 			}
+			assert(parent);
 			return parent;
 		}
 
@@ -433,11 +436,12 @@ namespace Surface {
 		}
 
 		~XwaylandPopup() {
+			assert(parent);
 			parent->removeChild(this);
 			wlr_scene_node_destroy(&root_node->node);
 		}
 
-		void arrange(Extends ext) {
+		void arrange(Extends ext) { //TODO: rearrange not supported
 			auto size = popup->size_hints;
 			extends = constrain({size->x, size->y, size->width, size->height}, ext);
 		}
@@ -544,11 +548,11 @@ namespace Surface {
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
 					debug("disassociate xwayland toplevel");
-					//BUG: ab und zue crashed es da. VLC: video luege
-					listeners->surface->map(false);
+					if(listeners->mapped) listeners->surface->map(false);
 				break;
 				case XWAYLAND_POPUP:
 					debug("disassociate xwayland popup");
+					delete listeners->popup_surface;
 					//TODO
 				break;
 				default:
@@ -569,7 +573,6 @@ namespace Surface {
 				break;
 				case XWAYLAND_POPUP:
 					debug("destroy xwayland popup");
-					delete listeners->popup_surface;
 				break;
 				default:
 				debug("xwayland surface of unknown type");

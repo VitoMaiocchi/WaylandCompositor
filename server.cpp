@@ -66,7 +66,7 @@ namespace Server {
 
         setenv("WAYLAND_DISPLAY", socket, true);
 
-        wlr_log_init(WLR_DEBUG, NULL);
+        //wlr_log_init(WLR_DEBUG, NULL);
 
         /* Run the Wayland event loop. This does not return until you exit the
         * compositor. Starting the backend rigged up all of the necessary event
