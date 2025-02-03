@@ -1,7 +1,8 @@
-VitoWM
+/VitoWM
 *-protocol.c
 *-protocol.h
 .vscode
 *.o
 log.txt
 backtrace.txt
+build
