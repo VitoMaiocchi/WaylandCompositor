@@ -64,17 +64,33 @@ namespace Surface {
 	}
 
 	wlr_scene_tree* Parent::addChild(Child* child) {
+		std::cout << "THIS: " << this << std::endl;
+		std::cout << "children size: " << children.size() << std::endl;
+		std::cout << "Add child: " << child << "\n to: {";
+		for(auto c : children) std::cout << c << "; ";
+		std::cout << "}" << std::endl;
 		assert(child);
+		assert(children.find(child) == children.end());
 		children.insert(child);
 		//this is not the most efficient and elegant solution but its good enough for now
 		arrangeAll();
+
+		std::cout << "post inster: {";
+		for(auto c : children) std::cout << c << "; ";
+		std::cout << "}" << std::endl;
 		return root_node;
 	}
 
     void Parent::removeChild(Child* child) {
+		std::cout << "pre remove: {";
+		for(auto c : children) std::cout << c << "; ";
+		std::cout << "}" << std::endl;
 		auto it = children.find(child);
 		assert(it != children.end()); //can not remove a child that has not been added
-		children.erase(child);
+		children.erase(it);
+		std::cout << "post remove: {";
+		for(auto c : children) std::cout << c << "; ";
+		std::cout << "}" << std::endl;
 	}
 
 	bool Parent::contains(int x, int y, bool include_children) {
@@ -250,6 +266,7 @@ namespace Surface {
 		listeners->xdg_toplevel = xdg_toplevel;
 		listeners->surface = new XdgToplevel(xdg_toplevel);
 		wlr_log(WLR_DEBUG, "new xdg toplevel %p", listeners->surface);
+		xdg_toplevel->base->data = nullptr;
 
 				//CONFIGURE LISTENERS
 		listeners->map_listener.notify = [](struct wl_listener* listener, void* data) {
@@ -288,6 +305,7 @@ namespace Surface {
 			assert(toplevel->base->initialized);
 
 			wlr_xdg_toplevel_decoration_v1* dec = (wlr_xdg_toplevel_decoration_v1*) toplevel->base->data;
+			if(!dec) return; //TODO: add full support for fullscreen: okular presentation mode
 			dec->scheduled_mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
 			wlr_xdg_surface_schedule_configure(toplevel->base);
 		};
@@ -411,7 +429,7 @@ namespace Surface {
 
         private:
         void setSurfaceSize(uint width, uint height) {
-			wlr_xwayland_surface_configure(xwayland_surface, 0,0, width, height);
+			wlr_xwayland_surface_configure(xwayland_surface, extends.x, extends.y, width, height);
 		}
 
         void setActivated(bool activated) {
@@ -426,18 +444,24 @@ namespace Surface {
 
 	//TODO: all this stuff is ugly and placeholder
 	xcb_window_t getLeader(xcb_window_t window);
+	xcb_window_t getXcbParent(xcb_window_t window);
 	std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
 
 	class XwaylandPopup : public Child {
 		wlr_xwayland_surface* popup;
 
 		static Parent* getParent(wlr_xwayland_surface* surface) {
+			std::cout << "get parent" << std::endl;
 			Parent* parent = (Parent*) surface->parent->data;
+			std::cout << "[basic parent] " << surface->parent << std::endl;
+			std::cout << "[basic parent - transient atom]" << getXcbParent(surface->window_id) << std::endl;
 			if(!parent) {
 				//the parent can sometimes be a unassocied suface
 				auto leader = getLeader(surface->parent->window_id);
 				assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
 				parent = (Parent*) fallbackToplevels[leader]->data;
+				std::cout << "leader=" << leader <<"; fallback=" << fallbackToplevels[leader] << "; data="<< parent << std::endl;
+				std::cout << "[leader parent] " << fallbackToplevels[leader] << std::endl;
 			}
 			assert(parent);
 			return parent;
@@ -445,6 +469,7 @@ namespace Surface {
 
 		public:
 		XwaylandPopup(wlr_xwayland_surface* popup_surface) : Child(getParent(popup_surface)), popup(popup_surface) {
+			std::cout << "[add surface as child] " << popup << std::endl;
 			const auto parent_scene_tree = parent->addChild(this);
 			root_node = wlr_scene_subsurface_tree_create(parent_scene_tree, popup->surface);
 			popup->data = this; //das bruchts da wahrschinlich gar nöd
@@ -516,12 +541,21 @@ namespace Surface {
 		wlr_log(WLR_DEBUG, "window: %#010x", listeners->wlr_surface->window_id);
 		wlr_log(WLR_DEBUG, "XCB client leader: %#010x", getLeader(listeners->wlr_surface->window_id));
 
+		std::cout << "[new xwayland surface] " << surface 
+			<< " window="<<listeners->wlr_surface->window_id 
+			<< " leader="<<getLeader(listeners->wlr_surface->window_id) <<std::endl;
+
 		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
 			listeners->type = getXWaylandWindowType(listeners->wlr_surface);
 
+			std::cout << "[associate xwayland surface] " << listeners->wlr_surface
+			<< " wlr_surface="<<listeners->wlr_surface->surface
+			<< " window="<<listeners->wlr_surface->window_id <<std::endl;
+
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
+					std::cout << "[set surface type] " << listeners->wlr_surface << " TOPLEVEL" << std::endl;
 					wlr_log(WLR_DEBUG, "new Xwayland Toplevel: %p", listeners->wlr_surface);
 					listeners->surface = new XwaylandToplevel(listeners->wlr_surface);
 					listeners->tryMap();
@@ -532,6 +566,7 @@ namespace Surface {
 					}
 				break;
 				case XWAYLAND_POPUP:
+					std::cout << "[set surface type] " << listeners->wlr_surface << " POPUP" << std::endl;
 					wlr_log(WLR_DEBUG, "new Xwayland popup: %p", listeners->wlr_surface);
 					listeners->popup_surface = new XwaylandPopup(listeners->wlr_surface);
 				break;
@@ -567,6 +602,11 @@ namespace Surface {
 				case XWAYLAND_TOPLEVEL:
 					debug("disassociate xwayland toplevel");
 					if(listeners->mapped) listeners->surface->map(false);
+					{ //delete leader fallback entry
+						auto leader = getLeader(listeners->wlr_surface->window_id);
+						auto it = fallbackToplevels.find(leader);
+						if(it->second == listeners->wlr_surface) fallbackToplevels.erase(it);
+					}
 				break;
 				case XWAYLAND_POPUP:
 					debug("disassociate xwayland popup");
@@ -714,7 +754,18 @@ namespace Surface {
 		free(reply);
 		if(xid) return *xid;
 		return 0;
-	} 
+	}
+
+	xcb_window_t getXcbParent(xcb_window_t window) {
+		xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
+		auto cookie = xcb_get_property(xc, 0, window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
+		auto reply = xcb_get_property_reply(xc, cookie, 0);
+		if(!reply) return 0;
+		xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
+		free(reply);
+		if(xid) return *xid;
+		return 0;
+	}
 
 	std::set<Atom> getAtoms(xcb_atom_t* atom_array, size_t size) {
 		std::set<Atom> a;
@@ -725,6 +776,7 @@ namespace Surface {
 		return a;
 	}
 
+	//debug (nöd nötig)
 	void printSet(std::set<Atom> atom) {
 		std::cout << "Atoms len:" << atom.size() << std::endl;
 		for(auto a : atom) std::cout << atom_string[a] << std::endl;
@@ -733,7 +785,7 @@ namespace Surface {
 
 	XWaylandWindowType getXWaylandWindowType(wlr_xwayland_surface* surface) {
 		std::set<Atom> a = getAtoms(surface->window_type, surface->window_type_len);
-		printSet(a); //debug
+		//printSet(a); //debug
 		if(a.find(NET_WM_WINDOW_TYPE_POPUP_MENU) != a.end()) return XWAYLAND_POPUP;
 		return XWAYLAND_TOPLEVEL;
 	}

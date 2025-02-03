@@ -5,6 +5,8 @@
 #include "output.hpp"
 #include <map>
 
+#include <iostream>
+
 namespace Input {
 
     wlr_cursor* cursor;
@@ -53,6 +55,7 @@ namespace Input {
             pointer_focus = surface;
             std::pair<int, int> cursor_cords = surface->surfaceCoordinateTransform(cursor->x, cursor->y);
             wlr_seat_pointer_notify_enter(seat, surface->getSurface(), cursor_cords.first, cursor_cords.second);
+            std::cout << "[cursor focus] " << surface->getSurface() << std::endl;
         }
     }
 

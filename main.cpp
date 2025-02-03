@@ -19,6 +19,10 @@ int main() {
 		Server::connected = false;
 	});
 
+	Input::registerKeyCallback(XKB_KEY_Escape, WLR_MODIFIER_LOGO, [](xkb_keysym_t sym, uint32_t modmask){
+		Server::connected = false;
+	});
+
 	for(xkb_keysym_t key = XKB_KEY_1; key <= XKB_KEY_9; key++) Input::registerKeyCallback(key, WLR_MODIFIER_LOGO, change_desktop);
 
 	Input::registerKeyCallback(XKB_KEY_XF86AudioRaiseVolume, 0, [](xkb_keysym_t sym, uint32_t modmask){
