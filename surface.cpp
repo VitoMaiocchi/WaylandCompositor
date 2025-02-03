@@ -38,7 +38,7 @@ namespace Surface {
 		public:
 		Child(Parent* parent) : parent(parent) {}
 		virtual ~Child() = default;
-		virtual void arrange(Extends ext) = 0; //extends of available space
+		virtual void arrange(Extends ext, int x, int y) = 0; //extends of available space
 		void arrangeAll() {
 			parent->arrangeAll();
 		}
@@ -51,16 +51,16 @@ namespace Surface {
 		return ext;
 	}
 
-	void Parent::arrangeChildren(Extends ext) {
-		ext = transform(ext, extends);
+	void Parent::arrangeChildren(Extends ext, int x, int y) {
+		//ext = transform(ext, extends);
 		for(Child* c : children) {
-			c->arrange(ext);
-			c->arrangeChildren(ext);
+			c->arrange(ext, x, y);
+			c->arrangeChildren(ext, x, y);
 		}
 	}
 
 	void Toplevel::arrangeAll() {
-		arrangeChildren(*child_ext);
+		arrangeChildren(*child_ext, extends.x, extends.y);
 	}
 
 	wlr_scene_tree* Parent::addChild(Child* child) {
@@ -346,7 +346,9 @@ namespace Surface {
 			wlr_scene_node_destroy(&root_node->node);
 		}
 
-		void arrange(Extends ext) {
+		void arrange(Extends ext, int x, int y) {
+			ext.x -= x;
+			ext.y -= y;
 			extends = constrain(popup->scheduled.geometry, ext);
 		}
 
@@ -449,6 +451,7 @@ namespace Surface {
 
 	class XwaylandPopup : public Child {
 		wlr_xwayland_surface* popup;
+		int parent_x, parent_y;
 
 		static Parent* getParent(wlr_xwayland_surface* surface) {
 			std::cout << "get parent" << std::endl;
@@ -475,7 +478,7 @@ namespace Surface {
 			popup->data = this; //das bruchts da wahrschinlich gar nöd
 
 			wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
-			wlr_xwayland_surface_configure(popup, extends.x, extends.y, extends.width, extends.height);
+			wlr_xwayland_surface_configure(popup, extends.x + parent_x, extends.y + parent_y, extends.width, extends.height);
 		}
 
 		~XwaylandPopup() {
@@ -484,9 +487,13 @@ namespace Surface {
 			wlr_scene_node_destroy(&root_node->node);
 		}
 
-		void arrange(Extends ext) { //TODO: rearrange not supported
+		void arrange(Extends ext, int x, int y) { //TODO: rearrange not supported
 			auto size = popup->size_hints;
 			extends = constrain({size->x, size->y, size->width, size->height}, ext);
+			extends.x -= x;
+			extends.y -= y;
+			parent_x = x;
+			parent_y = y;
 		}
 
 

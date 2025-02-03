@@ -31,7 +31,7 @@ namespace Surface {
         public:
         wlr_scene_tree* addChild(Child* child);
         void removeChild(Child* child);
-        void arrangeChildren(Extends ext);
+        void arrangeChildren(Extends ext, int x, int y);
         virtual void arrangeAll() = 0;
         bool contains(int x, int y, bool include_children);
         using Base::contains;
