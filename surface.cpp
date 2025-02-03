@@ -536,6 +536,8 @@ namespace Surface {
 			if(!mapped) return;
 			surface->map(true);
 		}
+
+		xcb_window_t fallback_toplevel_leader_entry = 0;
 	};
 
 	void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
@@ -568,8 +570,10 @@ namespace Surface {
 					listeners->tryMap();
 					{
 						auto leader = getLeader(listeners->wlr_surface->window_id);
-						if(fallbackToplevels.find(leader) == fallbackToplevels.end())
+						if(fallbackToplevels.find(leader) == fallbackToplevels.end()) {
 							fallbackToplevels[leader] = listeners->wlr_surface;
+							listeners->fallback_toplevel_leader_entry = leader;
+						}
 					}
 				break;
 				case XWAYLAND_POPUP:
@@ -609,10 +613,10 @@ namespace Surface {
 				case XWAYLAND_TOPLEVEL:
 					debug("disassociate xwayland toplevel");
 					if(listeners->mapped) listeners->surface->map(false);
-					{ //delete leader fallback entry
-						auto leader = getLeader(listeners->wlr_surface->window_id);
-						auto it = fallbackToplevels.find(leader);
-						if(it->second == listeners->wlr_surface) fallbackToplevels.erase(it);
+					if(listeners->fallback_toplevel_leader_entry) { //delete leader fallback entry
+						auto it = fallbackToplevels.find(listeners->fallback_toplevel_leader_entry);
+						assert(it != fallbackToplevels.end());
+						fallbackToplevels.erase(it);
 					}
 				break;
 				case XWAYLAND_POPUP:
