@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cassert>
 
+#define TitleBarHeight 30
+
 namespace Layout {
 
 /*
@@ -151,11 +153,6 @@ class Desktop {
     }
 };
 
-//FIXME: temorary workaround. Ich burch e besseri extends class
-Extends t_height(Extends ext) {
-    ext.height = 30;
-    return ext;
-}
 
 class Display {
     Extends extends;
@@ -165,7 +162,7 @@ class Display {
     bool focus = false;
 
     public:
-    Display(Extends ext) : extends(ext), titlebar(t_height(ext)) {
+    Display(Extends ext) : extends(ext), titlebar(ext.setHeight(TitleBarHeight)) {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
@@ -178,16 +175,11 @@ class Display {
         layout_ext.height -= 30;
         layout_ext.y += 30;
         for(auto &desktop : desktops) desktop.updateExtends(layout_ext);
-        titlebar.updateExtends(t_height(ext));
+        titlebar.updateExtends(ext.setHeight(TitleBarHeight));
     }
 
-    //FIXME: temorary workaround. Ich burch e besseri extends class
     bool contains(const double x, const double y) {
-        if(extends.x > x) return false;
-        if(extends.x + extends.width < x) return false;
-        if(extends.y > y) return false;
-        if(extends.y + extends.height < y) return false;
-        return true;
+        return extends.contains(x,y);
     }
 
     void setFocus(bool focus) {

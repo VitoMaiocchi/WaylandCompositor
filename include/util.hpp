@@ -2,8 +2,40 @@
 #include "wlr/util/box.h"
 #include <exception>
 #include <cassert>
+#include <unistd.h> 
 
-typedef wlr_box Extends;
+//TODO: Extends class mache wo denn Surface, Display, etc inherited
+struct Extends : wlr_box {
+    Extends() = default;
+    Extends(const wlr_box& box) : wlr_box(box) {}
+    Extends(int x, int y, int width, int height) : wlr_box({x,y,width,height}) {}
+
+    Extends& setHeight(int height) {
+        this->height = height;
+        return *this;
+    }
+
+    bool contains(int x, int y) {
+        if(this->x > x) return false;
+        if(this->x + this->width < x) return false;
+        if(this->y > y) return false;
+        if(this->y + this->height < y) return false;
+        return true;
+    }
+
+    //limit Extends to constraint area
+    Extends& constrain(Extends c) {
+        if(this->height > c.height) this->height = c.height;
+		if(this->width > c.width) this->width = c.width;
+
+		if(this->x + this->width > c.x + c.width) this->x = c.x + c.width - this->width;
+		else if(this->x < c.x) this->x = c.x;
+
+		if(this->y + this->height > c.y + c.height) this->y = c.y + c.height - this->height;
+		else if(this->y < c.y) this->y = c.y;
+		return *this;
+    }
+};
 
 inline void spawn(const char* cmd) {
     if (fork() == 0) {

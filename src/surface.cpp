@@ -44,13 +44,6 @@ namespace Surface {
 		}
 	};
 
-	//TODO: make this extends member function
-	inline Extends transform(Extends ext, Extends parent) {
-		ext.x -= parent.x;
-		ext.y -= parent.y;
-		return ext;
-	}
-
 	void Parent::arrangeChildren(Extends ext, int x, int y) {
 		//ext = transform(ext, extends);
 		for(Child* c : children) {
@@ -317,19 +310,6 @@ namespace Surface {
 		dec->toplevel->base->data = dec;
 	}
 
-	//TODO: Extends helper in util
-	inline Extends constrain(Extends e, Extends c) {
-		if(e.height > c.height) e.height = c.height;
-		if(e.width > c.width) e.width = c.width;
-
-		if(e.x + e.width > c.x + c.width) e.x = c.x + c.width - e.width;
-		else if(e.x < c.x) e.x = c.x;
-
-		if(e.y + e.height > c.y + c.height) e.y = c.y + c.height - e.height;
-		else if(e.y < c.y) e.y = c.y;
-		return e;
-	}
-
 	class XdgPopup : public Child {
 		wlr_xdg_popup* popup;
 
@@ -349,7 +329,7 @@ namespace Surface {
 		void arrange(Extends ext, int x, int y) {
 			ext.x -= x;
 			ext.y -= y;
-			extends = constrain(popup->scheduled.geometry, ext);
+			extends = Extends(popup->scheduled.geometry).constrain(ext);
 		}
 
 		void position() {
@@ -489,7 +469,7 @@ namespace Surface {
 
 		void arrange(Extends ext, int x, int y) { //TODO: rearrange not supported
 			auto size = popup->size_hints;
-			extends = constrain({size->x, size->y, size->width, size->height}, ext);
+			extends = Extends(size->x, size->y, size->width, size->height).constrain(ext);
 			extends.x -= x;
 			extends.y -= y;
 			parent_x = x;
