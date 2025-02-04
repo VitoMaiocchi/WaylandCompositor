@@ -125,15 +125,21 @@ class XdgPopup : public Surface::Child {
         wlr_scene_node_destroy(&root_node->node);
     }
 
+    //obsolet
     void arrange(Extends ext, int x, int y) {
-        ext.x -= x;
-        ext.y -= y;
-        extends = Extends(popup->scheduled.geometry).constrain(ext);
+        // ext.x -= x;
+        // ext.y -= y;
+        // extends = Extends(popup->scheduled.geometry).constrain(ext);
     }
 
     void position() {
         //FIXME: for a few ms the original postion shows up
         //		 idk if this is fixable without replacing wlroots
+        Extends ext = parent->getAvailableArea();
+        Point globalOffset = parent->getGlobalOffset();
+        ext.x -= globalOffset.x;
+        ext.y -= globalOffset.y;
+        extends = Extends(popup->scheduled.geometry).constrain(ext);
         popup->scheduled.geometry = extends;
         wlr_xdg_surface_schedule_configure(popup->base);
     }

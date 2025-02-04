@@ -35,6 +35,9 @@ namespace Surface {
         virtual void arrangeAll() = 0;
         bool contains(int x, int y, bool include_children);
         using Base::contains;
+
+        virtual Point getGlobalOffset() = 0;
+        virtual Extends& getAvailableArea() = 0;
     };
 
     //child surface of some parent
@@ -48,6 +51,9 @@ namespace Surface {
 		virtual ~Child() = default;
 		virtual void arrange(Extends ext, int x, int y) = 0; //extends of available space
 		void arrangeAll();
+        
+        Point getGlobalOffset();
+        Extends& getAvailableArea();
 	};
 
     class Toplevel : public Parent {
@@ -60,6 +66,9 @@ namespace Surface {
         std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
         void setChildExtends(Extends* ext);
         void arrangeAll();
+
+        Point getGlobalOffset();
+        Extends& getAvailableArea();
 
         protected:
         virtual void setSurfaceSize(uint width, uint height) = 0;

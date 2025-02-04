@@ -49,9 +49,10 @@ xcb_window_t getLeader(xcb_window_t window);
 //xcb_window_t getXcbParent(xcb_window_t window);
 std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
 
+
+//TODO: add option for rearrange
 class XwaylandPopup : public Surface::Child {
     wlr_xwayland_surface* popup;
-    int parent_x, parent_y;
 
     static Parent* getParent(wlr_xwayland_surface* surface) {
         Parent* parent = (Parent*) surface->parent->data;
@@ -71,8 +72,15 @@ class XwaylandPopup : public Surface::Child {
         root_node = wlr_scene_subsurface_tree_create(parent_scene_tree, popup->surface);
         popup->data = this; //das bruchts da wahrschinlich gar nöd
 
+        auto size = popup->size_hints;
+        Extends ext = parent->getAvailableArea();
+        Point globalOffset = parent->getGlobalOffset();
+        extends = Extends(size->x, size->y, size->width, size->height).constrain(ext);
+
+        wlr_xwayland_surface_configure(popup, extends.x, extends.y, extends.width, extends.height);
+        extends.x -= globalOffset.x;
+        extends.y -= globalOffset.y;
         wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
-        wlr_xwayland_surface_configure(popup, extends.x + parent_x, extends.y + parent_y, extends.width, extends.height);
     }
 
     ~XwaylandPopup() {
@@ -81,13 +89,14 @@ class XwaylandPopup : public Surface::Child {
         wlr_scene_node_destroy(&root_node->node);
     }
 
-    void arrange(Extends ext, int x, int y) { //TODO: rearrange not supported
-        auto size = popup->size_hints;
-        extends = Extends(size->x, size->y, size->width, size->height).constrain(ext);
-        extends.x -= x;
-        extends.y -= y;
-        parent_x = x;
-        parent_y = y;
+    //obsolet
+    void arrange(Extends ext, int x, int y) {
+        // auto size = popup->size_hints;
+        // extends = Extends(size->x, size->y, size->width, size->height).constrain(ext);
+        // extends.x -= x;
+        // extends.y -= y;
+        // parent_x = x;
+        // parent_y = y;
     }
 
 

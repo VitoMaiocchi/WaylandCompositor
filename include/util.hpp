@@ -7,6 +7,14 @@
 #include <map>
 #include <sstream>
 
+struct Point {
+    int x = 0;
+    int y = 0;
+    
+    Point() = default;
+    Point(int x, int y) : x(x), y(y) {}
+};
+
 //TODO: Extends class mache wo denn Surface, Display, etc inherited
 struct Extends : wlr_box {
     Extends() = default;

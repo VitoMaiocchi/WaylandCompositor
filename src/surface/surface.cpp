@@ -63,8 +63,26 @@ void Child::arrangeAll() {
 		parent->arrangeAll();
 }
 
+Point Child::getGlobalOffset() {
+	Point offset = parent->getGlobalOffset();
+	offset.x += extends.x;
+	offset.y += extends.y;
+	return offset;
+}
+
+Extends& Child::getAvailableArea() {
+	return parent->getAvailableArea();
+}
 
 //TOPLEVEL
+Point Toplevel::getGlobalOffset() {
+	return {extends.x, extends.y};
+}
+
+Extends& Toplevel::getAvailableArea() {
+	return *child_ext;
+}
+
 void Toplevel::arrangeAll() {
 	arrangeChildren(*child_ext, extends.x, extends.y);
 }
