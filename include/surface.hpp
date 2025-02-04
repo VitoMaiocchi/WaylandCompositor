@@ -37,6 +37,19 @@ namespace Surface {
         using Base::contains;
     };
 
+    //child surface of some parent
+	//child surfaces can be parents of other children
+	class Child : public Parent {
+		protected:
+		Parent* parent;
+
+		public:
+		Child(Parent* parent) : parent(parent) {}
+		virtual ~Child() = default;
+		virtual void arrange(Extends ext, int x, int y) = 0; //extends of available space
+		void arrangeAll();
+	};
+
     class Toplevel : public Parent {
         public:
         Toplevel();
@@ -73,5 +86,6 @@ namespace Surface {
         Extends* child_ext;
     };
 
-    void setup();
+    void setupXdgShell();
+    void setupXWayland();
 }

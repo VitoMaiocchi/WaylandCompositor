@@ -33,12 +33,13 @@ include/wlr-layer-shell-unstable-v1-protocol.h:
 		protocols/wlr-layer-shell-unstable-v1.xml $@
 
 
-SRCS = $(wildcard src/*.cpp)
+SRCS := $(shell find src -name '*.cpp')
 OBJS = $(patsubst src/%.cpp, build/%.o, $(SRCS))
 HEADERS = $(wildcard include/*.hpp)
 
 build/%.o: src/%.cpp $(HEADERS) include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h
 	@mkdir -p build
+	@mkdir -p $(dir $@)
 	@echo -e "$(YELLOW)Compiling $<...$(END)"
 	$(CXX) -c $< -o $@ $(FLAGS) -std=$(CXX_STANDARD)
 

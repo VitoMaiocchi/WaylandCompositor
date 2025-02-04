@@ -47,8 +47,9 @@ namespace Server {
         wlr_data_device_manager_create(display);
 
 
-        Output::setup();        
-        Surface::setup();
+        Output::setup();
+        Surface::setupXdgShell();
+        Surface::setupXWayland();
         Input::setup();
         Titlebar::setup();
 
