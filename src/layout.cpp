@@ -1,3 +1,4 @@
+#define LOGGER_CATEGORY Logger::LAYOUT
 #include "layout.hpp"
 #include "input.hpp"
 #include "output.hpp"
@@ -61,6 +62,7 @@ class TilingLayout {
     }
 
     void updateLayout(Extends &extends) {
+        debug("Update layout: Extends={}", extends);
         const uint n = surfaces.size();
         if(n == 0) return;
         const uint h = extends.width / n;
@@ -143,6 +145,7 @@ class Desktop {
     }
 
     void updateExtends(Extends ext) {
+        debug("Desktop update extends: Extends={}", extends);
         extends = ext;
         tilingLayout.updateLayout(extends);
     }
@@ -162,7 +165,7 @@ class Display {
     bool focus = false;
 
     public:
-    Display(Extends ext) : extends(ext), titlebar(ext.setHeight(TitleBarHeight)) {
+    Display(Extends ext) : extends(ext), titlebar(ext.withHeight(TitleBarHeight)) {
         Extends layout_ext = ext;
         layout_ext.height -= 30;
         layout_ext.y += 30;
@@ -175,7 +178,7 @@ class Display {
         layout_ext.height -= 30;
         layout_ext.y += 30;
         for(auto &desktop : desktops) desktop.updateExtends(layout_ext);
-        titlebar.updateExtends(ext.setHeight(TitleBarHeight));
+        titlebar.updateExtends(ext.withHeight(TitleBarHeight));
     }
 
     bool contains(const double x, const double y) {

@@ -47,7 +47,7 @@ VitoWM: $(OBJS)
 	$(CXX) -o VitoWM $^ $(LIBS) -std=$(CXX_STANDARD)
 
 clean:
-	rm -r VitoWM include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h build
+	rm -r VitoWM include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h build gdb_stacktrace.txt
 
 .DEFAULT_GOAL=VitoWM
 .PHONY: clean

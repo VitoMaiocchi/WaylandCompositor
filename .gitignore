@@ -6,3 +6,4 @@
 log.txt
 backtrace.txt
 build
+gdb_stacktrace.txt

@@ -122,6 +122,9 @@ namespace Surface {
 		}
 		
 		wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+		debug("Toplevel set suface size: width={}, height={}", extends.width, extends.height);
+		assert(extends.width > 0 && extends.height > 0);
+		//FIXME: surface size edge case
 		setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
 		wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
 

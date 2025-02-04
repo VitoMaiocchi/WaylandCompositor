@@ -5,6 +5,7 @@
 #include <unistd.h> 
 #include <format>
 #include <map>
+#include <sstream>
 
 //TODO: Extends class mache wo denn Surface, Display, etc inherited
 struct Extends : wlr_box {
@@ -15,6 +16,10 @@ struct Extends : wlr_box {
     Extends& setHeight(int height) {
         this->height = height;
         return *this;
+    }
+
+    Extends withHeight(int height) {
+        return {this->x,this->y,this->width,height};
     }
 
     bool contains(int x, int y) {
@@ -36,6 +41,20 @@ struct Extends : wlr_box {
 		if(this->y + this->height > c.y + c.height) this->y = c.y + c.height - this->height;
 		else if(this->y < c.y) this->y = c.y;
 		return *this;
+    }
+};
+
+//formatter for Extends
+template <>
+struct std::formatter<Extends> {
+    // Parse the format string (e.g., "{}" or "{:x,y}")
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin(); // No custom formatting
+    }
+
+    // Format the MyClass object
+    auto format(const Extends& ext, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "[x={},y={},width={},height={}]", ext.x,ext.y,ext.width,ext.height);
     }
 };
 
@@ -64,7 +83,7 @@ namespace Logger {
        DEBUG, //surface
        WARNING, //input
        WARNING, //output
-       WARNING, //layout
+       DEBUG, //layout
        DEBUG, //uncategorized
        INFO //server
     };
