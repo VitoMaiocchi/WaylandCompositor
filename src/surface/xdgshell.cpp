@@ -1,19 +1,13 @@
 #define LOGGER_CATEGORY Logger::SURFACE
 #include "surface.hpp"
-#include "config.hpp"
-#include "layout.hpp"
-#include "input.hpp"
-#include "output.hpp"
 #include "server.hpp"
+#include "output.hpp"
 
-#include <wlr/util/log.h>
 #include <cassert>
-#include <map>
-#include <set>
 
-namespace Surface {
+namespace {
 
-class XdgToplevel : public Toplevel {
+class XdgToplevel : public Surface::Toplevel {
     struct wlr_xdg_toplevel* xdg_toplevel;
 
     void setSurfaceSize(uint width, uint height) {
@@ -115,7 +109,7 @@ void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
     dec->toplevel->base->data = dec;
 }
 
-class XdgPopup : public Child {
+class XdgPopup : public Surface::Child {
     wlr_xdg_popup* popup;
 
     public:
@@ -191,7 +185,9 @@ void new_xdg_popup_notify(struct wl_listener* listener, void* data) {
     wl_signal_add(&xdg_popup->base->surface->events.commit, &listeners->commit);
 }
 
-void setupXdgShell() {
+}
+
+void Surface::setupXdgShell() {
     xdg_shell = wlr_xdg_shell_create(Server::display, 3);
     new_xdg_toplevel.notify = new_xdg_toplevel_notify;
     new_xdg_popup.notify = new_xdg_popup_notify;
@@ -205,6 +201,4 @@ void setupXdgShell() {
     xdg_decoration_mgr = wlr_xdg_decoration_manager_v1_create(Server::display);
     xdg_decoration_listener.notify = xdg_new_decoration_notify;
     wl_signal_add(&xdg_decoration_mgr->events.new_toplevel_decoration, &xdg_decoration_listener);
-}
-
 }

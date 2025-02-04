@@ -1,19 +1,16 @@
 #define LOGGER_CATEGORY Logger::SURFACE
 #include "surface.hpp"
-#include "config.hpp"
-#include "layout.hpp"
 #include "input.hpp"
 #include "output.hpp"
 #include "server.hpp"
 
-#include <wlr/util/log.h>
 #include <cassert>
 #include <map>
 #include <set>
 
-namespace Surface {
+namespace {
 
-class XwaylandToplevel : public Toplevel {
+class XwaylandToplevel : public Surface::Toplevel {
     wlr_xwayland_surface* xwayland_surface;
 
     public:
@@ -49,10 +46,10 @@ class XwaylandToplevel : public Toplevel {
 
 //TODO: all this stuff is ugly and placeholder
 xcb_window_t getLeader(xcb_window_t window);
-xcb_window_t getXcbParent(xcb_window_t window);
+//xcb_window_t getXcbParent(xcb_window_t window);
 std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
 
-class XwaylandPopup : public Child {
+class XwaylandPopup : public Surface::Child {
     wlr_xwayland_surface* popup;
     int parent_x, parent_y;
 
@@ -259,16 +256,6 @@ void xwayland_ready(struct wl_listener* listener, void* data) {
     xcb_disconnect(xc);
 }
 
-void setupXWayland() {
-    xwayland = wlr_xwayland_create(Server::display, Server::compositor, false);
-    
-    new_xwayland_surface.notify = new_xwayland_surface_notify;
-    wl_signal_add(&xwayland->events.new_surface, &new_xwayland_surface);
-    xwayland_ready_listener.notify = xwayland_ready;
-    wl_signal_add(&xwayland->events.ready, &xwayland_ready_listener);
-    setenv("DISPLAY", xwayland->display_name, 1);
-}
-
 
 //XCB ATOM STUFF
 //TODO: clean up this code
@@ -325,16 +312,16 @@ xcb_window_t getLeader(xcb_window_t window) {
     return 0;
 }
 
-xcb_window_t getXcbParent(xcb_window_t window) {
-    xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
-    auto cookie = xcb_get_property(xc, 0, window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
-    auto reply = xcb_get_property_reply(xc, cookie, 0);
-    if(!reply) return 0;
-    xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
-    free(reply);
-    if(xid) return *xid;
-    return 0;
-}
+// xcb_window_t getXcbParent(xcb_window_t window) {
+//     xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
+//     auto cookie = xcb_get_property(xc, 0, window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
+//     auto reply = xcb_get_property_reply(xc, cookie, 0);
+//     if(!reply) return 0;
+//     xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
+//     free(reply);
+//     if(xid) return *xid;
+//     return 0;
+// }
 
 std::set<Atom> getAtoms(xcb_atom_t* atom_array, size_t size) {
     std::set<Atom> a;
@@ -371,4 +358,14 @@ void fetch_atoms(xcb_connection_t* xc) {
 
 //TODO: xcb / xwayland selber implemente
 
+}
+
+void Surface::setupXWayland() {
+    xwayland = wlr_xwayland_create(Server::display, Server::compositor, false);
+    
+    new_xwayland_surface.notify = new_xwayland_surface_notify;
+    wl_signal_add(&xwayland->events.new_surface, &new_xwayland_surface);
+    xwayland_ready_listener.notify = xwayland_ready;
+    wl_signal_add(&xwayland->events.ready, &xwayland_ready_listener);
+    setenv("DISPLAY", xwayland->display_name, 1);
 }
