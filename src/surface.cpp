@@ -1,3 +1,4 @@
+#define LOGGER_CATEGORY Logger::SURFACE
 #include "surface.hpp"
 #include "config.hpp"
 #include "layout.hpp"
@@ -8,7 +9,6 @@
 #include <wlr/util/log.h>
 #include <cassert>
 #include <map>
-#include <iostream>
 #include <set>
 
 //TODO: clean all of this up it's horrible
@@ -57,33 +57,19 @@ namespace Surface {
 	}
 
 	wlr_scene_tree* Parent::addChild(Child* child) {
-		std::cout << "THIS: " << this << std::endl;
-		std::cout << "children size: " << children.size() << std::endl;
-		std::cout << "Add child: " << child << "\n to: {";
-		for(auto c : children) std::cout << c << "; ";
-		std::cout << "}" << std::endl;
 		assert(child);
 		assert(children.find(child) == children.end());
 		children.insert(child);
 		//this is not the most efficient and elegant solution but its good enough for now
 		arrangeAll();
 
-		std::cout << "post inster: {";
-		for(auto c : children) std::cout << c << "; ";
-		std::cout << "}" << std::endl;
 		return root_node;
 	}
 
     void Parent::removeChild(Child* child) {
-		std::cout << "pre remove: {";
-		for(auto c : children) std::cout << c << "; ";
-		std::cout << "}" << std::endl;
 		auto it = children.find(child);
 		assert(it != children.end()); //can not remove a child that has not been added
 		children.erase(it);
-		std::cout << "post remove: {";
-		for(auto c : children) std::cout << c << "; ";
-		std::cout << "}" << std::endl;
 	}
 
 	bool Parent::contains(int x, int y, bool include_children) {
@@ -115,8 +101,6 @@ namespace Surface {
 		focused = focus;
 		if(!visible) return;
 
-		if(!focus) debug("UNFOCUS");
-		if(focus) debug("FOCUS");
 		setActivated(focus);
 		if(!focus) {
 			for(int i = 0; i < 4; i++) wlr_scene_rect_set_color(border[i], bordercolor_inactive);
@@ -219,7 +203,6 @@ namespace Surface {
 
         public:
         XdgToplevel(wlr_xdg_toplevel* xdg_toplevel) {
-			debug("TOPLEVEL SURFACE");
 			this->xdg_toplevel = xdg_toplevel;
 			xdg_toplevel->base->surface->data = this;
 			root_node = wlr_scene_tree_create(&Output::scene->tree);
@@ -253,29 +236,24 @@ namespace Surface {
 	};
 
 	void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
-		debug("NEW XDG TOPLEVEL NOTIFY");
 		wlr_xdg_toplevel* xdg_toplevel = (wlr_xdg_toplevel*) data;
 		xdg_shell_surface_listeners* listeners = new xdg_shell_surface_listeners();
 		listeners->xdg_toplevel = xdg_toplevel;
 		listeners->surface = new XdgToplevel(xdg_toplevel);
-		wlr_log(WLR_DEBUG, "new xdg toplevel %p", listeners->surface);
 		xdg_toplevel->base->data = nullptr;
 
 				//CONFIGURE LISTENERS
 		listeners->map_listener.notify = [](struct wl_listener* listener, void* data) {
-			debug("MAP SURFACE");
 			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, map_listener);
 			listeners->surface->map_event(true);
 		};
 
 		listeners->unmap_listener.notify = [](struct wl_listener* listener, void* data) {
-			debug("UMAP SURFACE");
 			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, unmap_listener);
 			listeners->surface->map_event(false);
 		};
 
 		listeners->destroy_listener.notify = [](struct wl_listener* listener, void* data) {
-			debug("DESTROY SURFACE");
 			xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, destroy_listener);
 			delete listeners->surface;
 
@@ -356,10 +334,8 @@ namespace Surface {
 	void new_xdg_popup_notify(struct wl_listener* listener, void* data) {
 		wlr_xdg_popup* xdg_popup = (wlr_xdg_popup*) data;
 		if(!xdg_popup->parent) { //maybe make this assert idk
-			wlr_log(WLR_DEBUG, "XDG toplevel new popup: no parent");
 			return;
 		}
-		wlr_log(WLR_DEBUG, "XDG toplevel new popup with parent: %p", xdg_popup->parent);
 
 		xdg_popup_listeners* listeners = new xdg_popup_listeners();
 		listeners->popup = new XdgPopup(xdg_popup);
@@ -434,17 +410,12 @@ namespace Surface {
 		int parent_x, parent_y;
 
 		static Parent* getParent(wlr_xwayland_surface* surface) {
-			std::cout << "get parent" << std::endl;
 			Parent* parent = (Parent*) surface->parent->data;
-			std::cout << "[basic parent] " << surface->parent << std::endl;
-			std::cout << "[basic parent - transient atom]" << getXcbParent(surface->window_id) << std::endl;
 			if(!parent) {
 				//the parent can sometimes be a unassocied suface
 				auto leader = getLeader(surface->parent->window_id);
 				assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
 				parent = (Parent*) fallbackToplevels[leader]->data;
-				std::cout << "leader=" << leader <<"; fallback=" << fallbackToplevels[leader] << "; data="<< parent << std::endl;
-				std::cout << "[leader parent] " << fallbackToplevels[leader] << std::endl;
 			}
 			assert(parent);
 			return parent;
@@ -452,7 +423,6 @@ namespace Surface {
 
 		public:
 		XwaylandPopup(wlr_xwayland_surface* popup_surface) : Child(getParent(popup_surface)), popup(popup_surface) {
-			std::cout << "[add surface as child] " << popup << std::endl;
 			const auto parent_scene_tree = parent->addChild(this);
 			root_node = wlr_scene_subsurface_tree_create(parent_scene_tree, popup->surface);
 			popup->data = this; //das bruchts da wahrschinlich gar nöd
@@ -521,31 +491,20 @@ namespace Surface {
 	};
 
 	void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
-		wlr_log(WLR_DEBUG, "NEW XWAYLAND SURFACE NOTIFY: %p", data);
 		wlr_xwayland_surface* surface = (wlr_xwayland_surface*) data;
 		auto listeners = new xwayland_surface_listeners;
 		listeners->wlr_surface = surface;
 
-		wlr_log(WLR_DEBUG, "process: %u", listeners->wlr_surface->pid);
-		wlr_log(WLR_DEBUG, "window: %#010x", listeners->wlr_surface->window_id);
-		wlr_log(WLR_DEBUG, "XCB client leader: %#010x", getLeader(listeners->wlr_surface->window_id));
-
-		std::cout << "[new xwayland surface] " << surface 
-			<< " window="<<listeners->wlr_surface->window_id 
-			<< " leader="<<getLeader(listeners->wlr_surface->window_id) <<std::endl;
+		debug("new xwayland surface: window-id={}, leader={}", 
+			listeners->wlr_surface->window_id, 
+			getLeader(listeners->wlr_surface->window_id));
 
 		listeners->associate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
 			listeners->type = getXWaylandWindowType(listeners->wlr_surface);
 
-			std::cout << "[associate xwayland surface] " << listeners->wlr_surface
-			<< " wlr_surface="<<listeners->wlr_surface->surface
-			<< " window="<<listeners->wlr_surface->window_id <<std::endl;
-
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
-					std::cout << "[set surface type] " << listeners->wlr_surface << " TOPLEVEL" << std::endl;
-					wlr_log(WLR_DEBUG, "new Xwayland Toplevel: %p", listeners->wlr_surface);
 					listeners->surface = new XwaylandToplevel(listeners->wlr_surface);
 					listeners->tryMap();
 					{
@@ -557,12 +516,10 @@ namespace Surface {
 					}
 				break;
 				case XWAYLAND_POPUP:
-					std::cout << "[set surface type] " << listeners->wlr_surface << " POPUP" << std::endl;
-					wlr_log(WLR_DEBUG, "new Xwayland popup: %p", listeners->wlr_surface);
 					listeners->popup_surface = new XwaylandPopup(listeners->wlr_surface);
 				break;
 				default:
-				debug("xwayland surface of unknown type");
+				warn("xwayland surface of unknown type");
 				break;
 			}
 		};
@@ -570,16 +527,14 @@ namespace Surface {
 
 		listeners->map.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
-			wlr_log(WLR_DEBUG, "surface %p wants to be mapped", listeners->surface);
 			listeners->mapped = true;
 
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
-					debug("map xwayland toplevel");
 					listeners->tryMap();
 				break;
 				default:
-				debug("unhandled map case");
+				warn("unhandled map case");
 				break;
 			}
 		};
@@ -587,11 +542,9 @@ namespace Surface {
 
 		listeners->disassociate.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, disassociate);
-			wlr_log(WLR_DEBUG, "surface %p disassociated", listeners->surface);
 
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
-					debug("disassociate xwayland toplevel");
 					if(listeners->mapped) listeners->surface->map(false);
 					if(listeners->fallback_toplevel_leader_entry) { //delete leader fallback entry
 						auto it = fallbackToplevels.find(listeners->fallback_toplevel_leader_entry);
@@ -600,12 +553,10 @@ namespace Surface {
 					}
 				break;
 				case XWAYLAND_POPUP:
-					debug("disassociate xwayland popup");
 					delete listeners->popup_surface;
 					//TODO
 				break;
 				default:
-				debug("xwayland surface of unknown type");
 				break;
 			}
 		};
@@ -613,18 +564,15 @@ namespace Surface {
 
 		listeners->destroy.notify = [](struct wl_listener* listener, void* data) {
 			xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, destroy);
-			wlr_log(WLR_DEBUG, "surface %p destroyed", listeners->surface);
 
 			switch(listeners->type) {
 				case XWAYLAND_TOPLEVEL:
-					debug("destroy xwayland toplevel");
 					delete listeners->surface;
 				break;
 				case XWAYLAND_POPUP:
-					debug("destroy xwayland popup");
 				break;
 				default:
-				debug("xwayland surface of unknown type");
+				warn("xwayland surface of unknown type");
 				break;
 			}
 
@@ -641,12 +589,11 @@ namespace Surface {
 	void fetch_atoms(xcb_connection_t* xc);
 
 	void xwayland_ready(struct wl_listener* listener, void* data) {
-		debug("X WAYLAND READY");
 		struct wlr_xcursor *xcursor;
 		xcb_connection_t *xc = xcb_connect(xwayland->display_name, NULL);
 		int err = xcb_connection_has_error(xc);
 		if (err) {
-			fprintf(stderr, "xcb_connect to X server failed with code %d\n. Continuing with degraded functionality.\n", err);
+			error("xcb connection error. failed with code {}",err);
 			return;
 		}
 
@@ -666,8 +613,6 @@ namespace Surface {
 	}
 
 	void setup() {
-		debug("SURFACE SETUP");
-
 		xdg_shell = wlr_xdg_shell_create(Server::display, 3);
 		new_xdg_toplevel.notify = new_xdg_toplevel_notify;
 		new_xdg_popup.notify = new_xdg_popup_notify;
@@ -767,13 +712,6 @@ namespace Surface {
 		return a;
 	}
 
-	//debug (nöd nötig)
-	void printSet(std::set<Atom> atom) {
-		std::cout << "Atoms len:" << atom.size() << std::endl;
-		for(auto a : atom) std::cout << atom_string[a] << std::endl;
-	}
-
-
 	XWaylandWindowType getXWaylandWindowType(wlr_xwayland_surface* surface) {
 		std::set<Atom> a = getAtoms(surface->window_type, surface->window_type_len);
 		//printSet(a); //debug
@@ -798,19 +736,5 @@ namespace Surface {
 		free(reply2);
 	}
 
-	/*
-	TODO: xWayland selber implemente
-
-	get parent:
-	xcb_connection_t *xc = xcb_connect(xwayland->display_name, NULL);
-	auto cookie = xcb_get_property(xc, 0, listeners->wlr_surface->window_id, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
-	auto reply = xcb_get_property_reply(xc, cookie, 0);
-	xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
-	if(xid) wlr_log(WLR_DEBUG, "XCB transient for: %#010x", *xid);
-	else wlr_log(WLR_DEBUG, "XCB transient for: NULL");
-	free(reply);
-	xcb_disconnect(xc);
-
-	*/
-
+	//TODO: xcb / xwayland selber implemente
 }

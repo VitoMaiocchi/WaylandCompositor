@@ -1,3 +1,4 @@
+#define LOGGER_CATEGORY Logger::OUTPUT
 #include "output.hpp"
 #include "includes.hpp"
 #include "layout.hpp"
@@ -6,7 +7,6 @@
 #include <functional>
 #include <algorithm>
 #include <pulse/pulseaudio.h>
-#include <iostream>
 #include <cmath>
 #include <atomic>
 
@@ -289,7 +289,7 @@ namespace Output {
 		pa_context_set_state_callback(context, [](pa_context *c, void *userdata) {
 			if (pa_context_get_state(c) == PA_CONTEXT_READY) {
 				connected = true;
-				std::cout << "PULSE READY" << std::endl;
+				debug("pulse ready");
 				pa_context_get_sink_info_by_name(c, "@DEFAULT_SINK@", get_sink_volume_callback, nullptr);
 				pa_context_set_subscribe_callback(c, subscribe_callback, nullptr);
 				pa_context_subscribe(c, PA_SUBSCRIPTION_MASK_SINK, nullptr, nullptr);

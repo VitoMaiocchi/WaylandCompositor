@@ -1,6 +1,8 @@
 CXX = clang++
 CC = clang
 
+CXX_STANDARD = c++23
+
 WAYLAND_PROTOCOLS=$(shell pkg-config --variable=pkgdatadir wayland-protocols)
 WAYLAND_SCANNER=$(shell pkg-config --variable=wayland_scanner wayland-scanner)
 LIBS=-L/usr/lib \
@@ -38,11 +40,11 @@ HEADERS = $(wildcard include/*.hpp)
 build/%.o: src/%.cpp $(HEADERS) include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h
 	@mkdir -p build
 	@echo -e "$(YELLOW)Compiling $<...$(END)"
-	$(CXX) -c $< -o $@ $(FLAGS)
+	$(CXX) -c $< -o $@ $(FLAGS) -std=$(CXX_STANDARD)
 
 VitoWM: $(OBJS)
 	@echo -e "$(GREEN)Linking Final Executable...$(END)"
-	$(CXX) -o VitoWM $^ $(LIBS)
+	$(CXX) -o VitoWM $^ $(LIBS) -std=$(CXX_STANDARD)
 
 clean:
 	rm -r VitoWM include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h build

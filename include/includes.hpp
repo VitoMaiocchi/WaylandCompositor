@@ -30,8 +30,6 @@
 // pthread first because it uses class in a C++ way and XWayland includes that...
 #include <pthread.h>
 
-#define debug(M) wlr_log(WLR_DEBUG, M)
-
 #define class     _class
 #define namespace _namespace
 #define static

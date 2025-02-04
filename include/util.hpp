@@ -3,6 +3,8 @@
 #include <exception>
 #include <cassert>
 #include <unistd.h> 
+#include <format>
+#include <map>
 
 //TODO: Extends class mache wo denn Surface, Display, etc inherited
 struct Extends : wlr_box {
@@ -37,6 +39,67 @@ struct Extends : wlr_box {
     }
 };
 
+namespace Logger {
+    enum Importance {
+        DEBUG,
+        INFO,
+        WARNING,
+        ERROR,
+        SILENT,
+    };
+
+    enum Category {
+        WL_ROOTS,
+        SURFACE,
+        INPUT,
+        OUTPUT,
+        LAYOUT,
+        UNCATEGORIZED,
+        SERVER,
+        categories_len
+    };
+
+    const Importance verbosity[categories_len] = {
+       ERROR, //wlroots: hard coded
+       DEBUG, //surface
+       WARNING, //input
+       WARNING, //output
+       WARNING, //layout
+       DEBUG, //uncategorized
+       INFO //server
+    };
+
+    void setup();
+    void print_message(std::string message, Importance importance, Category category, const char* file, int line);
+    inline void log_message(std::string message, Importance importance, Category category, const char* file, int line) {
+        if(importance < verbosity[category]) return;
+        assert(importance < SILENT);
+        print_message(message, importance, category, file, line);
+    }
+}
+
+#ifdef LOGGER_CATEGORY
+#define log(importance, message, ...) \
+    Logger::log_message(std::format(message, ##__VA_ARGS__), importance, LOGGER_CATEGORY, _WLR_FILENAME, __LINE__)
+#else
+#define log(importance, message, ...) \
+    Logger::log_message(std::format(message, ##__VA_ARGS__), importance, Logger::UNCATEGORIZED, _WLR_FILENAME, __LINE__)
+#endif
+
+#define debug(message, ...) \
+    log(Logger::DEBUG, message, ##__VA_ARGS__)
+
+#define info(message, ...) \
+    log(Logger::INFO, message, ##__VA_ARGS__)
+
+#define warn(message, ...) \
+    log(Logger::WARNING, message, ##__VA_ARGS__)
+
+#define error(message, ...) \
+    log(Logger::ERROR, message, ##__VA_ARGS__)
+
+
+
 inline void spawn(const char* cmd) {
     if (fork() == 0) {
         execl("/bin/sh", "/bin/sh", "-c", cmd, (void *)NULL);
@@ -44,67 +107,10 @@ inline void spawn(const char* cmd) {
     }
 }
 
-/*
-    UTILITY ZÜG WOS NO BRUCHT
-    [ ] Extend type mit guete util member functions
-    [ ] Ahständigs log system (mit std::format)
-*/
-
-//ICH GLAUB DE OPTIONAL POINTER ISCH EN SCHEISS
-
-template <typename T>
-class OptionalPointer {
-    uint* ref_count = nullptr; //should not be null
-    bool* deleted = nullptr; //should not be null
-    T* ptr = nullptr; //can be null
-
-    public:
-    //OptionalPointer() : ptr(nullptr) {} //nüt
-
-    OptionalPointer(const OptionalPointer &other) : ref_count(other.ref_count), deleted(other.deleted), ptr(other.ptr) {
-        assert(ref_count);
-        assert(deleted);
-        *ref_count += 1;
-    }
-    OptionalPointer(T* ptr) : ref_count(new uint(1)), deleted(new bool(false)), ptr(ptr) {}
-    //template<typename... Args>
-    //OptionalPointer(Args&&... args) : ptr(new T(std::forward<Args>(args)...)), ref_count(new uint(1)), deleted(new bool(false)) {}
-
-    ~OptionalPointer() {
-        *ref_count -= 1;
-        if(ref_count == 0) {
-            delete ref_count;
-            if(!*deleted) delete ptr;
-            delete deleted;
-        }
-    }
-
-    void destroy() {
-        if(*deleted) throw std::runtime_error("Optional Pointer allready deleted");
-        *deleted = true;
-        assert(ptr);
-        delete ptr;
-    }
-
-    bool exists() {
-        return !*deleted;
-    }
-
-    T* operator->() const {
-        if(*deleted) throw std::runtime_error("Optional Pointer has been deleted");
-        assert(ptr);
-        return ptr;
-    }
-
-    T* get() const {
-        if(*deleted) return nullptr;
-        return ptr;
-    }
-
-    bool operator==(const OptionalPointer& other) const {
-        if (*deleted != *other.deleted) return false;
-        if (!*deleted && ptr == other.ptr) return true;
-        return false;
-    }
-};
-
+constexpr const char* UNIXTERM_GRAY = "\033[90m";
+constexpr const char* UNIXTERM_BLUE = "\033[34m";
+constexpr const char* UNIXTERM_YELLOW = "\033[1;33m";
+constexpr const char* UNIXTERM_RED = "\033[31m";
+constexpr const char* UNIXTERM_BOLD = "\033[1m";
+constexpr const char* UNIXTERM_BOLDRED = "\033[31m\033[1m";
+constexpr const char* UNIXTERM_RESET = "\033[0m";

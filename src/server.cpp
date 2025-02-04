@@ -1,3 +1,4 @@
+#define LOGGER_CATEGORY Logger::SERVER
 #include "server.hpp"
 #include "includes.hpp"
 #include "output.hpp"
@@ -11,7 +12,7 @@
 #include <chrono>
 
 #define ASSERT_NOTNULL(n, m) if(!n) {   \
-    wlr_log(WLR_ERROR, m);              \
+    error(m);                           \
     return 1;                           \
 }
 
@@ -25,14 +26,9 @@ namespace Server {
 
     void dispatchEvents();
 
-    void wlr_log_callback(enum wlr_log_importance importance, const char *fmt, va_list args) {
-        //this is for debug purposes. It makes the program crash on wlr error. for easy bracktrace
-        if(importance == WLR_ERROR) throw std::runtime_error("WLR ERROR: " + std::string(fmt));
-    }
 
     bool setup() {
-        wlr_log_init(WLR_ERROR, NULL);
-        //wlr_log_init(WLR_ERROR, wlr_log_callback);
+        Logger::setup();
         display = wl_display_create();
 
         backend = wlr_backend_autocreate(wl_display_get_event_loop(display), NULL);
@@ -72,13 +68,12 @@ namespace Server {
 
         setenv("WAYLAND_DISPLAY", socket, true);
 
-        //wlr_log_init(WLR_DEBUG, NULL);
 
         /* Run the Wayland event loop. This does not return until you exit the
         * compositor. Starting the backend rigged up all of the necessary event
         * loop configuration to listen to libinput events, DRM events, generate
         * frame events at the refresh rate, and so on. */
-        wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s", socket);
+        info("Starting wayland compositor on WAYLAND_DISPLAY={}", socket);
         wl_event_loop* event_loop = wl_display_get_event_loop(display);
 
         auto last = std::chrono::steady_clock::now();
