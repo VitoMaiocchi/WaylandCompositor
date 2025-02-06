@@ -12,6 +12,7 @@ class Titlebar {
     static void setup();
     static int update_titlebars(void* data);
     static void updateVolume(uint volume_percent);
+    static void updateAudioMute(bool muted);
 
     private:
     void drawBuffer();

@@ -33,5 +33,9 @@ int main() {
 		Output::adjustVolume(-0.02);
 	});
 
+	Input::registerKeyCallback(XKB_KEY_XF86AudioMute, 0, [](xkb_keysym_t sym, uint32_t modmask){
+		Output::muteVolume();
+	});
+
 	Server::setup();
 }

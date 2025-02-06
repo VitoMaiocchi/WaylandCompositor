@@ -29,4 +29,5 @@ namespace Output {
 
     //value must be between -1 and 1
     void adjustVolume(double vol);
+    void muteVolume();
 }
