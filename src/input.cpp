@@ -9,7 +9,7 @@ namespace Input {
 
     wlr_cursor* cursor;
 	wlr_xcursor_manager* cursor_mgr;
-	Surface::Base* pointer_focus;
+	Surface::Toplevel* pointer_focus;
 	wl_listener cursor_motion;
 	wl_listener cursor_motion_absolute;
 	wl_listener cursor_button;
@@ -32,13 +32,13 @@ namespace Input {
         wl_listener destroy;
     };
 
-    void setKeyboardFocus(Surface::Base* surface) {
+    void setKeyboardFocus(Surface::Toplevel* surface) {
 		struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(Input::seat);
 		if (keyboard) wlr_seat_keyboard_notify_enter(Input::seat, surface->getSurface(),
 				keyboard->keycodes, keyboard->num_keycodes, &keyboard->modifiers);
     }
 
-    void setCursorFocus(Surface::Base* surface) {
+    void setCursorFocus(Surface::Toplevel* surface) {
         if(!surface) {
             if(pointer_focus) {
                 wlr_seat_pointer_clear_focus(seat);

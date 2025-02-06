@@ -125,13 +125,6 @@ class XdgPopup : public Surface::Child {
         wlr_scene_node_destroy(&root_node->node);
     }
 
-    //obsolet
-    void arrange(Extends ext, int x, int y) {
-        // ext.x -= x;
-        // ext.y -= y;
-        // extends = Extends(popup->scheduled.geometry).constrain(ext);
-    }
-
     void position() {
         //FIXME: for a few ms the original postion shows up
         //		 idk if this is fixable without replacing wlroots
@@ -143,12 +136,6 @@ class XdgPopup : public Surface::Child {
         popup->scheduled.geometry = extends;
         wlr_xdg_surface_schedule_configure(popup->base);
     }
-
-    //TODO: restructure inheritance: das züg bruchts alles nöd
-    void setFocus(bool focus) {}
-    wlr_surface* getSurface() {return nullptr;}
-    std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {return {0,0};}
-    void extendsUpdateNotify(bool resize) {}
 };
 
 struct xdg_popup_listeners {

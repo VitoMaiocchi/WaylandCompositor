@@ -8,19 +8,11 @@
 namespace Surface {
     class Base {
         public:
-        void setExtends(wlr_box extends);
         bool contains(int x, int y);
 
-        virtual void setFocus(bool focus) = 0;
-        virtual wlr_surface* getSurface() = 0;
-        virtual std::pair<int, int> surfaceCoordinateTransform(int x, int y) const = 0;
-
-        //ich will das eig nöd public
-        wlr_scene_tree* root_node = nullptr; //Root node of the Window. It is the parent of the surface and possible borders
         protected:
+        wlr_scene_tree* root_node = nullptr; //Root node of the Window. It is the parent of the surface and possible borders
         Extends extends = {0,0,0,0}; //size of the window including the borders
-
-        virtual void extendsUpdateNotify(bool resize) = 0;
     };
 
     class Child;
@@ -31,8 +23,6 @@ namespace Surface {
         public:
         wlr_scene_tree* addChild(Child* child);
         void removeChild(Child* child);
-        void arrangeChildren(Extends ext, int x, int y);
-        virtual void arrangeAll() = 0;
         bool contains(int x, int y, bool include_children);
         using Base::contains;
 
@@ -49,8 +39,6 @@ namespace Surface {
 		public:
 		Child(Parent* parent) : parent(parent) {}
 		virtual ~Child() = default;
-		virtual void arrange(Extends ext, int x, int y) = 0; //extends of available space
-		void arrangeAll();
         
         Point getGlobalOffset();
         Extends& getAvailableArea();
@@ -61,14 +49,16 @@ namespace Surface {
         Toplevel();
         virtual ~Toplevel() = default;
         
+        void setExtends(wlr_box extends);
         void setFocus(bool focus);
         void setVisibility(bool visible);
         std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
         void setChildExtends(Extends* ext);
-        void arrangeAll();
 
         Point getGlobalOffset();
         Extends& getAvailableArea();
+
+        virtual wlr_surface* getSurface() = 0;
 
         protected:
         virtual void setSurfaceSize(uint width, uint height) = 0;

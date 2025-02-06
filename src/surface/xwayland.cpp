@@ -88,23 +88,6 @@ class XwaylandPopup : public Surface::Child {
         parent->removeChild(this);
         wlr_scene_node_destroy(&root_node->node);
     }
-
-    //obsolet
-    void arrange(Extends ext, int x, int y) {
-        // auto size = popup->size_hints;
-        // extends = Extends(size->x, size->y, size->width, size->height).constrain(ext);
-        // extends.x -= x;
-        // extends.y -= y;
-        // parent_x = x;
-        // parent_y = y;
-    }
-
-
-    //TODO: restructure inheritance: das züg bruchts alles nöd
-    void setFocus(bool focus) {}
-    wlr_surface* getSurface() {return nullptr;}
-    std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {return {0,0};}
-    void extendsUpdateNotify(bool resize) {}
 };
 
 wlr_xwayland* xwayland;

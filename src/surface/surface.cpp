@@ -17,20 +17,11 @@ bool Base::contains(int x, int y) {
 	return true;
 }
 
-void Base::setExtends(wlr_box extends) {
-	bool resize = this->extends.width != extends.width || this->extends.height != extends.height;
-	this->extends = extends;
-	extendsUpdateNotify(resize);
-}
-
 //PARENT
 wlr_scene_tree* Parent::addChild(Child* child) {
 	assert(child);
 	assert(children.find(child) == children.end());
 	children.insert(child);
-	//this is not the most efficient and elegant solution but its good enough for now
-	arrangeAll();
-
 	return root_node;
 }
 
@@ -49,20 +40,7 @@ bool Parent::contains(int x, int y, bool include_children) {
 	return false;
 }
 
-void Parent::arrangeChildren(Extends ext, int x, int y) {
-	//ext = transform(ext, extends);
-	for(Child* c : children) {
-		c->arrange(ext, x, y);
-		c->arrangeChildren(ext, x, y);
-	}
-}
-
-
 //CHILD
-void Child::arrangeAll() {
-		parent->arrangeAll();
-}
-
 Point Child::getGlobalOffset() {
 	Point offset = parent->getGlobalOffset();
 	offset.x += extends.x;
@@ -75,6 +53,12 @@ Extends& Child::getAvailableArea() {
 }
 
 //TOPLEVEL
+void Toplevel::setExtends(wlr_box extends) {
+	bool resize = this->extends.width != extends.width || this->extends.height != extends.height;
+	this->extends = extends;
+	extendsUpdateNotify(resize);
+}
+
 Point Toplevel::getGlobalOffset() {
 	return {extends.x, extends.y};
 }
@@ -83,13 +67,9 @@ Extends& Toplevel::getAvailableArea() {
 	return *child_ext;
 }
 
-void Toplevel::arrangeAll() {
-	arrangeChildren(*child_ext, extends.x, extends.y);
-}
-
+//TODO: rename and update for all children 
 void Toplevel::setChildExtends(Extends* ext) {
 	child_ext = ext;
-	arrangeAll();
 }
 
 Toplevel::Toplevel() {
