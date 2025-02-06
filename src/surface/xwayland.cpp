@@ -68,13 +68,15 @@ class XwaylandPopup : public Surface::Child {
 
     public:
     XwaylandPopup(wlr_xwayland_surface* popup_surface) : Child(getParent(popup_surface)), popup(popup_surface) {
-        const auto parent_scene_tree = parent->addChild(this);
-        root_node = wlr_scene_subsurface_tree_create(parent_scene_tree, popup->surface);
+        assert(parent_root);
+        root_node = wlr_scene_subsurface_tree_create(parent_root, popup->surface);
         popup->data = this; //das bruchts da wahrschinlich gar nöd
 
         auto size = popup->size_hints;
-        Extends ext = parent->getAvailableArea();
-        Point globalOffset = parent->getGlobalOffset();
+        Extends ext = getAvailableArea();
+        extends.x = 0;
+        extends.y = 0;
+        Point globalOffset = getGlobalOffset();
         extends = Extends(size->x, size->y, size->width, size->height).constrain(ext);
 
         wlr_xwayland_surface_configure(popup, extends.x, extends.y, extends.width, extends.height);
@@ -84,8 +86,6 @@ class XwaylandPopup : public Surface::Child {
     }
 
     ~XwaylandPopup() {
-        assert(parent);
-        parent->removeChild(this);
         wlr_scene_node_destroy(&root_node->node);
     }
 };

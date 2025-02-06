@@ -18,16 +18,18 @@ namespace Surface {
     class Child;
 
     class Parent : public Base{
+        friend Child;
         std::set<Child*> children;
-
-        public:
-        wlr_scene_tree* addChild(Child* child);
-        void removeChild(Child* child);
-        bool contains(int x, int y, bool include_children);
-        using Base::contains;
 
         virtual Point getGlobalOffset() = 0;
         virtual Extends& getAvailableArea() = 0;
+
+        wlr_scene_tree* addChild(Child* child);
+        void removeChild(Child* child);
+
+        public:
+        bool contains(int x, int y, bool include_children);
+        using Base::contains;
     };
 
     //child surface of some parent
@@ -35,10 +37,10 @@ namespace Surface {
 	class Child : public Parent {
 		protected:
 		Parent* parent;
+        wlr_scene_tree* parent_root;
 
-		public:
-		Child(Parent* parent) : parent(parent) {}
-		virtual ~Child() = default;
+		Child(Parent* parent);
+		virtual ~Child();
         
         Point getGlobalOffset();
         Extends& getAvailableArea();
@@ -46,33 +48,31 @@ namespace Surface {
 
     class Toplevel : public Parent {
         public:
-        Toplevel();
-        virtual ~Toplevel() = default;
-        
-        void setExtends(wlr_box extends);
+        void setExtends(Extends extends);
         void setFocus(bool focus);
         void setVisibility(bool visible);
+
+        void setAvailableArea(Extends ext);
         std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
-        void setChildExtends(Extends* ext);
-
-        Point getGlobalOffset();
-        Extends& getAvailableArea();
-
         virtual wlr_surface* getSurface() = 0;
 
         protected:
+        Toplevel();
+        virtual ~Toplevel() = default;
+
         virtual void setSurfaceSize(uint width, uint height) = 0;
         virtual void setActivated(bool activated) = 0; 
-
-        wlr_scene_tree* surface_node; //Surface node: holds the surface itself without decorations
-        wlr_scene_rect* border[4]; // Borders of the window in the following order: top, bottom, left, right
 
         void mapNotify(bool mapped);
         void minimizeRequestNotify(bool minimize); //TODO minimize support
         void fullscreenRequestNotify(bool fullscreen); //TODO fullscreen support
 
+        wlr_scene_tree* surface_node; //Surface node: holds the surface itself without decorations
+        wlr_scene_rect* border[4]; // Borders of the window in the following order: top, bottom, left, right
+
         private:
-        void extendsUpdateNotify(bool resize);
+        Point getGlobalOffset();
+        Extends& getAvailableArea();
 
         bool visible; //visibility determined by layout
         bool maximized;
@@ -82,7 +82,7 @@ namespace Surface {
         bool minimized;
         bool fullscreen;
 
-        Extends* child_ext;
+        Extends availableArea;
     };
 
     void setupXdgShell();

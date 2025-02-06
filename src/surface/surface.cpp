@@ -52,11 +52,33 @@ Extends& Child::getAvailableArea() {
 	return parent->getAvailableArea();
 }
 
+Child::Child(Parent* parent): parent(parent), parent_root(parent->addChild(this)){}
+
+Child::~Child() {
+	assert(parent);
+	parent->removeChild(this);
+}
+
 //TOPLEVEL
-void Toplevel::setExtends(wlr_box extends) {
-	bool resize = this->extends.width != extends.width || this->extends.height != extends.height;
+void Toplevel::setExtends(Extends extends) {
+	const bool resize = this->extends.width != extends.width || this->extends.height != extends.height;
 	this->extends = extends;
-	extendsUpdateNotify(resize);
+	if(!visible) return;
+
+	//UPDATE WINDOW DECORATION
+	wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+	//TODO: possibly rearrange children
+	if(!resize) return; //the rest only involves resize
+
+	setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
+	
+	wlr_scene_node_set_position(&border[1]->node, 0, extends.height-BORDERWIDTH);
+	wlr_scene_node_set_position(&border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
+
+	wlr_scene_rect_set_size(border[0], extends.width, BORDERWIDTH);
+	wlr_scene_rect_set_size(border[1], extends.width, BORDERWIDTH);
+	wlr_scene_rect_set_size(border[2], BORDERWIDTH, extends.height-2*BORDERWIDTH);
+	wlr_scene_rect_set_size(border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
 }
 
 Point Toplevel::getGlobalOffset() {
@@ -64,12 +86,12 @@ Point Toplevel::getGlobalOffset() {
 }
 
 Extends& Toplevel::getAvailableArea() {
-	return *child_ext;
+	return availableArea;
 }
 
 //TODO: rename and update for all children 
-void Toplevel::setChildExtends(Extends* ext) {
-	child_ext = ext;
+void Toplevel::setAvailableArea(Extends ext) {
+	availableArea = ext;
 }
 
 Toplevel::Toplevel() {
@@ -77,7 +99,7 @@ Toplevel::Toplevel() {
 	extends = {0,0,0,0};
 	visible = false;
 	focused = false;
-	child_ext = &extends;
+	availableArea = extends;
 }
 
 void Toplevel::setFocus(bool focus) {
@@ -151,25 +173,6 @@ void Toplevel::mapNotify(bool mapped) {
 		wlr_scene_node_destroy(&border[i]->node);
 		border[i] = NULL;
 	}
-}
-
-void Toplevel::extendsUpdateNotify(bool resize) {
-	if(!visible) return;
-
-	//UPDATE WINDOW DECORATION
-	wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
-	//TODO: possibly rearrange children
-	if(!resize) return; //the rest only involves resize
-
-	setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
-	
-	wlr_scene_node_set_position(&border[1]->node, 0, extends.height-BORDERWIDTH);
-	wlr_scene_node_set_position(&border[3]->node, extends.width-BORDERWIDTH, BORDERWIDTH);
-
-	wlr_scene_rect_set_size(border[0], extends.width, BORDERWIDTH);
-	wlr_scene_rect_set_size(border[1], extends.width, BORDERWIDTH);
-	wlr_scene_rect_set_size(border[2], BORDERWIDTH, extends.height-2*BORDERWIDTH);
-	wlr_scene_rect_set_size(border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
 }
 
 }

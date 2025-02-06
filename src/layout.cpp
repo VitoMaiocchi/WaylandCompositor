@@ -70,12 +70,12 @@ class TilingLayout {
         wlr_box ext = extends;
         ext.width = extends.width - (n-1)*h;
         (*i)->setExtends(ext);
-        (*i)->setChildExtends(&extends); //TODO: suboptimal das musi zu desktop schiebe
+        (*i)->setAvailableArea(extends); //TODO: suboptimal das musi zu desktop schiebe
         ext.x += extends.width - (n-1)*h;
         i++;
         while(i != surfaces.end()) {
             (*i)->setExtends(ext);
-            (*i)->setChildExtends(&extends);
+            (*i)->setAvailableArea(extends);
             ext.x += h;
             i++;
         }
