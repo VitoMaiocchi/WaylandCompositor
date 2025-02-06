@@ -90,8 +90,8 @@ namespace Logger {
        ERROR, //wlroots: hard coded
        DEBUG, //surface
        WARNING, //input
-       WARNING, //output
-       DEBUG, //layout
+       DEBUG, //output
+       ERROR, //layout
        DEBUG, //uncategorized
        INFO //server
     };

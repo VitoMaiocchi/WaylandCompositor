@@ -1,3 +1,10 @@
+#include <wireplumber-0.5/wp/wp.h>
+#include <spa-0.2/spa/utils/defs.h>
+#include <spa-0.2/spa/utils/string.h>
+#include <pipewire-0.3/pipewire/pipewire.h>
+#include <pipewire-0.3/pipewire/keys.h>
+#include <pipewire-0.3/pipewire/extensions/session-manager/keys.h>
+
 #define LOGGER_CATEGORY Logger::OUTPUT
 #include "output.hpp"
 #include "includes.hpp"
@@ -231,12 +238,16 @@ namespace Output {
 	void adjustVolume(double vol) {
 		assert(vol < 1 && vol > -1);
 		if(!connected) return;
+		if(!default_sink) return;
 
 		pa_threaded_mainloop_lock(mainloop);
 
 		pa_cvolume new_vol;
 		new_vol.channels = default_sink->volume.channels;
-		for(uint i = 0; i < default_sink->volume.channels; i++) {
+		debug("default channels: {}", default_sink->volume.channels);
+		uint max = PA_CHANNELS_MAX < new_vol.channels ? PA_CHANNELS_MAX : new_vol.channels;
+		debug("max={}",max);
+		for(uint i = 0; i < max; i++) {
 			pa_volume_t o = default_sink->volume.values[i];
 			pa_volume_t n;
 			if(vol > 0) {
@@ -251,6 +262,7 @@ namespace Output {
 		pa_context_set_sink_volume_by_index(context, default_sink->index, &new_vol, nullptr, nullptr);
 		//TODO: das mit by name und nöd by index mache den muss mer de sink nöd speichere pa_context_set_sink_volume_by_name()
 		pa_threaded_mainloop_unlock(mainloop);
+		debug("KYS");
 	}
 
 	void synchronized_volume_update(void* data) {
@@ -280,7 +292,151 @@ namespace Output {
 		}
 	}
 
+	GOptionContext* gcontext;
+	GMainLoop* loop;
+	WpCore* core;
+	WpObjectManager* om;
+	uint pending_plugins = 0;
+
+	void default_node_update_notify(GObject *emitter, guint arg, gpointer user_data) {
+		debug("DEFAULT NODE UPDATE");
+	}
+
+	void mixer_update_notify(GObject *emitter, guint arg, gpointer user_data) {
+		debug("VOLUME CHANGE (MIXER) UPDATE");
+	}
+
+	static void on_plugin_loaded (WpCore * core, GAsyncResult * res, void* data) {
+		GError *error = NULL;
+
+		if (!wp_core_load_component_finish (core, res, &error)) {
+			fprintf (stderr, "%s\n", error->message);
+			error("error loading pipewire/wireplumber plugin");
+			g_main_loop_quit (loop);
+			return;
+		}
+
+		if (--pending_plugins == 0) {
+			auto mixer_api = wp_plugin_find (core, "mixer-api");
+			g_object_set (mixer_api, "scale", 1 /* cubic */, NULL);
+			wp_core_install_object_manager (core, om);
+		}
+	}
+
+	#define MAXINT32	(0x7fffffff)
+	#define MAXUINT32	(0xffffffff)
+
+	int32_t get_default_sink_id(WpPlugin* def_nodes_api) {
+		int32_t res = -1;
+
+		g_signal_emit_by_name (def_nodes_api, "get-default-node", "Audio/Sink", &res); //"Audio/Source" für source
+		if(res <= 0 || res >= MAXUINT32) error("default node id is not valid");
+
+		return res;
+	}
+
+
+	void do_print_volume (gpointer proxy) {
+		WpPlugin* mixer_api = wp_plugin_find (core, "mixer-api");
+		GVariant *variant = NULL;
+		gboolean mute = FALSE;
+		gdouble volume = 1.0;
+		int32_t id = wp_proxy_get_bound_id (WP_PROXY (proxy));
+
+	
+		g_signal_emit_by_name (mixer_api, "get-volume", id, &variant);
+		if (!variant) {
+			fprintf (stderr, "Node %d does not support volume\n", id);
+			return;
+		}
+		g_variant_lookup (variant, "volume", "d", &volume);
+		g_variant_lookup (variant, "mute", "b", &mute);
+		g_clear_pointer (&variant, g_variant_unref);
+
+		printf ("Volume: %.2f%s", volume, mute ? " [MUTED]\n" : "\n");
+	}
+
+	void state_changed_callback (WpNode * self, WpNodeState old_state, WpNodeState new_state, gpointer user_data) {
+		debug("STATE CHANGED");
+	}
+
+	void get_volume_run(void* data) {
+		WpPlugin* def_nodes_api = NULL;
+		GError* error = NULL;
+		gpointer proxy = NULL; // (WpPipewireObject*)
+		int32_t id;
+
+		def_nodes_api = wp_plugin_find (core, "default-nodes-api");
+		id = get_default_sink_id(def_nodes_api);
+
+		proxy = wp_object_manager_lookup (om, WP_TYPE_GLOBAL_PROXY,
+			WP_CONSTRAINT_TYPE_G_PROPERTY, "bound-id", "=u", id, NULL);
+
+		if (!proxy) {
+			fprintf (stderr, "Node '%d' not found\n", id);
+			return;
+		}
+
+		g_signal_connect(
+		proxy,         // The Wireplumber object (e.g., WpNode, WpGlobalProxy)
+		"state-changed",  // The name of the signal (e.g., "notify", "volume-changed")
+		G_CALLBACK(state_changed_callback),  // Your callback
+		nullptr     // Optional data passed to the callback
+		);
+
+		do_print_volume(proxy);
+
+		WpPlugin* mixer_api = wp_plugin_find (core, "mixer-api");
+
+		g_signal_connect(def_nodes_api, "changed", G_CALLBACK(default_node_update_notify), nullptr);
+		g_signal_connect(mixer_api, "changed", G_CALLBACK(mixer_update_notify), nullptr);  
+
+	}
+
+	static gboolean get_volume_prepare() {
+		wp_object_manager_add_interest (om, WP_TYPE_NODE, NULL);
+		wp_object_manager_request_object_features (om, WP_TYPE_GLOBAL_PROXY,
+			WP_PIPEWIRE_OBJECT_FEATURES_MINIMAL);
+		return TRUE;
+	}
+
+	void setupPipeWire() {
+		wp_init (WP_INIT_ALL);
+		gcontext = g_option_context_new ("Vito Manager");
+		loop = g_main_loop_new (NULL, FALSE);
+		core = wp_core_new (NULL, NULL, NULL);
+		om = wp_object_manager_new ();
+
+		get_volume_prepare();
+
+		 /* load required API modules */
+		pending_plugins++;
+		wp_core_load_component (core, "libwireplumber-module-default-nodes-api",
+			"module", NULL, NULL, NULL, (GAsyncReadyCallback) on_plugin_loaded, nullptr);
+		pending_plugins++;
+		wp_core_load_component (core, "libwireplumber-module-mixer-api",
+			"module", NULL, NULL, NULL, (GAsyncReadyCallback) on_plugin_loaded, nullptr);
+
+		/* connect */
+		if (!wp_core_connect (core)) {
+			fprintf (stderr, "Could not connect to PipeWire\n");
+			error("Could not connect to PipeWire");
+			return;
+		}
+
+		/* run */
+		g_signal_connect_swapped (core, "disconnected",
+			(GCallback) g_main_loop_quit, loop);
+		g_signal_connect_swapped (om, "installed",
+			(GCallback) get_volume_run, nullptr);
+
+		while(true) g_main_context_iteration(g_main_loop_get_context(loop), true);
+		debug("kys");
+	}
+
 	void setupPulseAudio() {
+		setupPipeWire();
+
 		mainloop = pa_threaded_mainloop_new();
 		pa_mainloop_api *mainloop_api = pa_threaded_mainloop_get_api(mainloop);
 		context = pa_context_new(mainloop_api, "Vito Manager");

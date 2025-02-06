@@ -11,9 +11,11 @@ LIBS=-L/usr/lib \
 	 $(shell pkg-config --cflags --libs xkbcommon) \
 	 $(shell pkg-config --cflags --libs cairo) \
 	 $(shell pkg-config --cflags --libs xcb) \
-	 $(shell pkg-config --cflags --libs libpulse)
+	 $(shell pkg-config --cflags --libs libpulse) \
+	 $(shell pkg-config --cflags --libs libspa-0.2 libpipewire-0.3 wireplumber-0.5)
 
-FLAGS=$(CFLAGS) -g -O0 -Wall -I/usr/include/pixman-1 -I. -I./include -I/usr/include/wlroots-0.18 -DWLR_USE_UNSTABLE
+FLAGS=$(CFLAGS) -g -O0 -Wall -I/usr/include/pixman-1 -I. -I./include -I/usr/include/wlroots-0.18 -DWLR_USE_UNSTABLE \
+	$(shell pkg-config --cflags libspa-0.2 libpipewire-0.3 wireplumber-0.5)
 
 GREEN=\033[1;32m
 RED=\033[1;31m
@@ -46,6 +48,9 @@ build/%.o: src/%.cpp $(HEADERS) include/xdg-shell-protocol.h include/wlr-layer-s
 VitoWM: $(OBJS)
 	@echo -e "$(GREEN)Linking Final Executable...$(END)"
 	$(CXX) -o VitoWM $^ $(LIBS) -std=$(CXX_STANDARD)
+
+wpctl: src/wpctl.c
+	$(CC) -o wpctl src/wpctl.c $(shell pkg-config --cflags --libs libspa-0.2 libpipewire-0.3 wireplumber-0.5)
 
 clean:
 	rm -r VitoWM include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h build gdb_stacktrace.txt
