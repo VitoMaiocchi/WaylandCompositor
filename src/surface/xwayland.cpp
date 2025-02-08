@@ -104,6 +104,7 @@ struct XWaylandSurface {
     wl_listener destroy;
 
     bool mapped = false;
+    XWaylandSurface* fallbackLeader = nullptr;
 
     void tryMap() {
         assert(type == XWAYLAND_TOPLEVEL);
@@ -137,8 +138,10 @@ void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
                 listeners->tryMap();
                 {
                     auto leader = getLeader(listeners->wlr_surface->window_id, true);
-                    if(leader->type == XWAYLAND_UNASSOCIATED && !leader->fallback)
+                    if(leader->type == XWAYLAND_UNASSOCIATED && !leader->fallback) {
                         leader->fallback = listeners;
+                        listeners->fallbackLeader = leader;
+                    }
                 }
             break;
             case XWAYLAND_POPUP:
@@ -172,10 +175,7 @@ void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
         switch(listeners->type) {
             case XWAYLAND_TOPLEVEL:
                 if(listeners->mapped) listeners->toplevel->map(false);
-                {
-                    auto leader = getLeader(listeners->wlr_surface->window_id, false);
-                    if(leader && leader->fallback == listeners) leader->fallback = nullptr;
-                }
+                if(listeners->fallbackLeader) listeners->fallbackLeader->fallback = nullptr;
             break;
             case XWAYLAND_POPUP:
                 delete listeners->popup;
