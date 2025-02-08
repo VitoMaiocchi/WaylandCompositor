@@ -7,6 +7,8 @@
 
 namespace {
 
+    //TOPLEVEL
+
 class XdgToplevel : public Surface::Toplevel {
     struct wlr_xdg_toplevel* xdg_toplevel;
 
@@ -39,18 +41,12 @@ class XdgToplevel : public Surface::Toplevel {
     }
 };
 
-wlr_xdg_shell *xdg_shell;
-wl_listener new_xdg_toplevel;
-wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
-wl_listener xdg_decoration_listener;
-wl_listener new_xdg_popup;
-
 struct xdg_shell_surface_listeners {
     XdgToplevel* surface;
 
-    wl_listener map_listener;
-    wl_listener unmap_listener;
-    wl_listener destroy_listener;
+    wl_listener map;
+    wl_listener unmap;
+    wl_listener destroy;
     wl_listener commit;
 
     wlr_xdg_toplevel* xdg_toplevel;
@@ -64,30 +60,26 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
     xdg_toplevel->base->data = nullptr;
 
             //CONFIGURE LISTENERS
-    listeners->map_listener.notify = [](struct wl_listener* listener, void* data) {
-        xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, map_listener);
+    listeners->map.notify = [](struct wl_listener* listener, void* data) {
+        xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, map);
         listeners->surface->map_event(true);
     };
 
-    listeners->unmap_listener.notify = [](struct wl_listener* listener, void* data) {
-        xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, unmap_listener);
+    listeners->unmap.notify = [](struct wl_listener* listener, void* data) {
+        xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, unmap);
         listeners->surface->map_event(false);
     };
 
-    listeners->destroy_listener.notify = [](struct wl_listener* listener, void* data) {
-        xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, destroy_listener);
+    listeners->destroy.notify = [](struct wl_listener* listener, void* data) {
+        xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, destroy);
         delete listeners->surface;
 
-        wl_list_remove(&listeners->map_listener.link);
-        wl_list_remove(&listeners->unmap_listener.link);
-        wl_list_remove(&listeners->destroy_listener.link);
+        wl_list_remove(&listeners->map.link);
+        wl_list_remove(&listeners->unmap.link);
+        wl_list_remove(&listeners->destroy.link);
 
         delete listeners;
     };
-
-    wl_signal_add(&xdg_toplevel->base->surface->events.map, 		&listeners->map_listener);
-    wl_signal_add(&xdg_toplevel->base->surface->events.unmap, 		&listeners->unmap_listener);
-    wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&listeners->destroy_listener);
 
     listeners->commit.notify = [](struct wl_listener* listener, void* data) {
         xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, commit);
@@ -101,13 +93,22 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
         dec->scheduled_mode = WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE;
         wlr_xdg_surface_schedule_configure(toplevel->base);
     };
-    wl_signal_add(&xdg_toplevel->base->surface->events.commit, 	&listeners->commit);
+
+    wl_signal_add(&xdg_toplevel->base->surface->events.map, 		&listeners->map);
+    wl_signal_add(&xdg_toplevel->base->surface->events.unmap, 		&listeners->unmap);
+    wl_signal_add(&xdg_toplevel->base->surface->events.destroy, 	&listeners->destroy);
+    wl_signal_add(&xdg_toplevel->base->surface->events.commit, 	    &listeners->commit);
 }
 
 void xdg_new_decoration_notify(struct wl_listener *listener, void *data) {
     struct wlr_xdg_toplevel_decoration_v1 *dec = (wlr_xdg_toplevel_decoration_v1*) data;
     dec->toplevel->base->data = dec;
 }
+
+
+
+
+    //POPUP
 
 class XdgPopup : public Surface::Child {
     wlr_xdg_popup* popup;
@@ -134,7 +135,7 @@ class XdgPopup : public Surface::Child {
         Extends ext = getAvailableArea();
         ext.x -= globalOffset.x;
         ext.y -= globalOffset.y;
-        
+
         extends = Extends(popup->scheduled.geometry).constrain(ext);
         popup->scheduled.geometry = extends;
         wlr_xdg_surface_schedule_configure(popup->base);
@@ -159,27 +160,35 @@ void new_xdg_popup_notify(struct wl_listener* listener, void* data) {
     
     listeners->destroy.notify = [](wl_listener* listener, void* data) {
         xdg_popup_listeners* listeners = wl_container_of(listener, listeners, destroy);
-        // FIXME: this crashes idk why
-        // wl_list_remove(&listeners->destroy.link);
-        // wl_list_remove(&listeners->reposition.link);
-        // wl_list_remove(&listeners->commit.link);
+        wl_list_remove(&listeners->destroy.link);
+        wl_list_remove(&listeners->reposition.link);
+        wl_list_remove(&listeners->commit.link);
         delete listeners->popup;
         delete listeners;
     };
-    wl_signal_add(&xdg_popup->events.destroy, &listeners->destroy);
 
     listeners->reposition.notify = [](wl_listener* listener, void* data) {
         xdg_popup_listeners* listeners = wl_container_of(listener, listeners, reposition);
         listeners->popup->position();
     };
-    wl_signal_add(&xdg_popup->events.destroy, &listeners->destroy);
 
     listeners->commit.notify = [](wl_listener* listener, void* data) {
         xdg_popup_listeners* listeners = wl_container_of(listener, listeners, commit);
         listeners->popup->position();
     };
+
+    wl_signal_add(&xdg_popup->events.destroy, &listeners->destroy);
+    wl_signal_add(&xdg_popup->events.reposition, &listeners->reposition);
     wl_signal_add(&xdg_popup->base->surface->events.commit, &listeners->commit);
 }
+
+
+
+wlr_xdg_shell *xdg_shell;
+wl_listener new_xdg_toplevel;
+wl_listener new_xdg_popup;
+wl_listener xdg_decoration_listener;
+wlr_xdg_decoration_manager_v1 *xdg_decoration_mgr;
 
 }
 

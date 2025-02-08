@@ -10,14 +10,19 @@ namespace Surface {
 
 //BASE CLASS
 bool Base::contains(int x, int y) {
-	if(extends.x > x) return false;
-	if(extends.x + extends.width < x) return false;
-	if(extends.y > y) return false;
-	if(extends.y + extends.height < y) return false;
-	return true;
+	return extends.contains(x,y);
 }
 
 //PARENT
+bool Parent::contains(int x, int y, bool include_children) {
+	if(!include_children) return Base::contains(x,y);
+	if(Base::contains(x,y)) return true;
+	x -= extends.x;
+	y -= extends.y;
+	for(auto c : children) if(c->contains(x,y,true)) return true;
+	return false;
+}
+
 wlr_scene_tree* Parent::addChild(Child* child) {
 	assert(child);
 	assert(children.find(child) == children.end());
@@ -31,16 +36,14 @@ void Parent::removeChild(Child* child) {
 	children.erase(it);
 }
 
-bool Parent::contains(int x, int y, bool include_children) {
-	if(!include_children) return Base::contains(x,y);
-	if(Base::contains(x,y)) return true;
-	x -= extends.x;
-	y -= extends.y;
-	for(auto c : children) if(c->contains(x,y,true)) return true;
-	return false;
+//CHILD
+Child::Child(Parent* parent): parent(parent), parent_root(parent->addChild(this)){}
+
+Child::~Child() {
+	assert(parent);
+	parent->removeChild(this);
 }
 
-//CHILD
 Point Child::getGlobalOffset() {
 	Point offset = parent->getGlobalOffset();
 	offset.x += extends.x;
@@ -52,14 +55,28 @@ Extends& Child::getAvailableArea() {
 	return parent->getAvailableArea();
 }
 
-Child::Child(Parent* parent): parent(parent), parent_root(parent->addChild(this)){}
-
-Child::~Child() {
-	assert(parent);
-	parent->removeChild(this);
+//TOPLEVEL
+Toplevel::Toplevel() {
+	for(uint i = 0; i < 4; i++) border[i] = NULL;
+	extends = {0,0,0,0};
+	visible = false;
+	focused = false;
+	availableArea = extends;
 }
 
-//TOPLEVEL
+Point Toplevel::getGlobalOffset() {
+	return {extends.x, extends.y};
+}
+
+Extends& Toplevel::getAvailableArea() {
+	return availableArea;
+}
+
+//TODO: update for all children 
+void Toplevel::setAvailableArea(Extends ext) {
+	availableArea = ext;
+}
+
 void Toplevel::setExtends(Extends extends) {
 	const bool resize = this->extends.width != extends.width || this->extends.height != extends.height;
 	this->extends = extends;
@@ -79,27 +96,6 @@ void Toplevel::setExtends(Extends extends) {
 	wlr_scene_rect_set_size(border[1], extends.width, BORDERWIDTH);
 	wlr_scene_rect_set_size(border[2], BORDERWIDTH, extends.height-2*BORDERWIDTH);
 	wlr_scene_rect_set_size(border[3], BORDERWIDTH, extends.height-2*BORDERWIDTH);
-}
-
-Point Toplevel::getGlobalOffset() {
-	return {extends.x, extends.y};
-}
-
-Extends& Toplevel::getAvailableArea() {
-	return availableArea;
-}
-
-//TODO: rename and update for all children 
-void Toplevel::setAvailableArea(Extends ext) {
-	availableArea = ext;
-}
-
-Toplevel::Toplevel() {
-	for(uint i = 0; i < 4; i++) border[i] = NULL;
-	extends = {0,0,0,0};
-	visible = false;
-	focused = false;
-	availableArea = extends;
 }
 
 void Toplevel::setFocus(bool focus) {

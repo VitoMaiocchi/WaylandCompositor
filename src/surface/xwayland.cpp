@@ -41,33 +41,14 @@ class XwaylandToplevel : public Surface::Toplevel {
     wlr_surface* getSurface() {
         return xwayland_surface->surface;
     }
-
 };
-
-//TODO: all this stuff is ugly and placeholder
-xcb_window_t getLeader(xcb_window_t window);
-//xcb_window_t getXcbParent(xcb_window_t window);
-std::map<xcb_window_t, wlr_xwayland_surface*> fallbackToplevels;
-
 
 //TODO: add option for rearrange
 class XwaylandPopup : public Surface::Child {
     wlr_xwayland_surface* popup;
 
-    static Parent* getParent(wlr_xwayland_surface* surface) {
-        Parent* parent = (Parent*) surface->parent->data;
-        if(!parent) {
-            //the parent can sometimes be a unassocied suface
-            auto leader = getLeader(surface->parent->window_id);
-            assert(fallbackToplevels.find(leader) != fallbackToplevels.end()); //DEBUG
-            parent = (Parent*) fallbackToplevels[leader]->data;
-        }
-        assert(parent);
-        return parent;
-    }
-
     public:
-    XwaylandPopup(wlr_xwayland_surface* popup_surface) : Child(getParent(popup_surface)), popup(popup_surface) {
+    XwaylandPopup(wlr_xwayland_surface* popup_surface, Parent* parent) : Child(parent), popup(popup_surface) {
         assert(parent_root);
         root_node = wlr_scene_subsurface_tree_create(parent_root, popup->surface);
         popup->data = this; //das bruchts da wahrschinlich gar nöd
@@ -90,9 +71,9 @@ class XwaylandPopup : public Surface::Child {
     }
 };
 
-wlr_xwayland* xwayland;
-wl_listener new_xwayland_surface;
-wl_listener xwayland_ready_listener;
+
+
+
 
 enum XWaylandWindowType {
     XWAYLAND_UNASSOCIATED,
@@ -100,13 +81,23 @@ enum XWaylandWindowType {
     XWAYLAND_POPUP,
 };
 
+struct XWaylandSurface;
+std::map<xcb_window_t, XWaylandSurface> surfaces;
 XWaylandWindowType getXWaylandWindowType(wlr_xwayland_surface* surface);
+XWaylandSurface* getSurface(xcb_window_t window_id, bool create);
+XWaylandSurface* getLeader(xcb_window_t window_id, bool create);
+Surface::Parent* getParent(xcb_window_t window);
 
-struct xwayland_surface_listeners {
+struct XWaylandSurface {
+    wlr_xwayland_surface* wlr_surface = nullptr;
+
+    XWaylandWindowType type = XWAYLAND_UNASSOCIATED;
     union {
-        XwaylandToplevel* surface;
-        XwaylandPopup* popup_surface;
+        XWaylandSurface* fallback = nullptr;
+        XwaylandToplevel* toplevel;
+        XwaylandPopup* popup;
     };
+
     wl_listener map;
     wl_listener associate;
     wl_listener disassociate;
@@ -114,45 +105,44 @@ struct xwayland_surface_listeners {
 
     bool mapped = false;
 
-    wlr_xwayland_surface* wlr_surface;
-    XWaylandWindowType type = XWAYLAND_UNASSOCIATED;
-
     void tryMap() {
         assert(type == XWAYLAND_TOPLEVEL);
         if(!mapped) return;
-        surface->map(true);
+        toplevel->map(true);
     }
-
-    xcb_window_t fallback_toplevel_leader_entry = 0;
 };
+
+XWaylandSurface* getSurface(xcb_window_t window_id, bool create) {
+    auto it = surfaces.find(window_id);
+    if(it != surfaces.end()) return &it->second;
+    if(!create) return nullptr;
+    surfaces[window_id] = XWaylandSurface();
+    return &surfaces[window_id];
+}
 
 void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
     wlr_xwayland_surface* surface = (wlr_xwayland_surface*) data;
-    auto listeners = new xwayland_surface_listeners;
+    auto listeners = getSurface(surface->window_id, true);
     listeners->wlr_surface = surface;
 
-    debug("new xwayland surface: window-id={}, leader={}", 
-        listeners->wlr_surface->window_id, 
-        getLeader(listeners->wlr_surface->window_id));
+    debug("new xwayland surface: window-id={}", listeners->wlr_surface->window_id);
 
     listeners->associate.notify = [](struct wl_listener* listener, void* data) {
-        xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, associate);
+        XWaylandSurface* listeners = wl_container_of(listener, listeners, associate);
         listeners->type = getXWaylandWindowType(listeners->wlr_surface);
 
         switch(listeners->type) {
             case XWAYLAND_TOPLEVEL:
-                listeners->surface = new XwaylandToplevel(listeners->wlr_surface);
+                listeners->toplevel = new XwaylandToplevel(listeners->wlr_surface);
                 listeners->tryMap();
                 {
-                    auto leader = getLeader(listeners->wlr_surface->window_id);
-                    if(fallbackToplevels.find(leader) == fallbackToplevels.end()) {
-                        fallbackToplevels[leader] = listeners->wlr_surface;
-                        listeners->fallback_toplevel_leader_entry = leader;
-                    }
+                    auto leader = getLeader(listeners->wlr_surface->window_id, true);
+                    if(leader->type == XWAYLAND_UNASSOCIATED && !leader->fallback)
+                        leader->fallback = listeners;
                 }
             break;
             case XWAYLAND_POPUP:
-                listeners->popup_surface = new XwaylandPopup(listeners->wlr_surface);
+                listeners->popup = new XwaylandPopup(listeners->wlr_surface, getParent(listeners->wlr_surface->window_id));
             break;
             default:
             warn("xwayland surface of unknown type");
@@ -162,7 +152,7 @@ void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
     wl_signal_add(&surface->events.associate, &listeners->associate);
 
     listeners->map.notify = [](struct wl_listener* listener, void* data) {
-        xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, map);
+        XWaylandSurface* listeners = wl_container_of(listener, listeners, map);
         listeners->mapped = true;
 
         switch(listeners->type) {
@@ -177,19 +167,18 @@ void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
     wl_signal_add(&surface->events.map_request, &listeners->map);
 
     listeners->disassociate.notify = [](struct wl_listener* listener, void* data) {
-        xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, disassociate);
+        XWaylandSurface* listeners = wl_container_of(listener, listeners, disassociate);
 
         switch(listeners->type) {
             case XWAYLAND_TOPLEVEL:
-                if(listeners->mapped) listeners->surface->map(false);
-                if(listeners->fallback_toplevel_leader_entry) { //delete leader fallback entry
-                    auto it = fallbackToplevels.find(listeners->fallback_toplevel_leader_entry);
-                    assert(it != fallbackToplevels.end());
-                    fallbackToplevels.erase(it);
+                if(listeners->mapped) listeners->toplevel->map(false);
+                {
+                    auto leader = getLeader(listeners->wlr_surface->window_id, false);
+                    if(leader && leader->fallback == listeners) leader->fallback = nullptr;
                 }
             break;
             case XWAYLAND_POPUP:
-                delete listeners->popup_surface;
+                delete listeners->popup;
                 //TODO
             break;
             default:
@@ -199,11 +188,11 @@ void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
     wl_signal_add(&surface->events.dissociate, &listeners->disassociate);
 
     listeners->destroy.notify = [](struct wl_listener* listener, void* data) {
-        xwayland_surface_listeners* listeners = wl_container_of(listener, listeners, destroy);
+        XWaylandSurface* listeners = wl_container_of(listener, listeners, destroy);
 
         switch(listeners->type) {
             case XWAYLAND_TOPLEVEL:
-                delete listeners->surface;
+                delete listeners->toplevel;
             break;
             case XWAYLAND_POPUP:
             break;
@@ -217,36 +206,14 @@ void new_xwayland_surface_notify(struct wl_listener* listener, void* data) {
         wl_list_remove(&listeners->disassociate.link);
         wl_list_remove(&listeners->destroy.link);
 
-        delete listeners;
+        auto it = surfaces.find(listeners->wlr_surface->window_id);
+        surfaces.erase(it);
     };
     wl_signal_add(&surface->events.destroy, &listeners->destroy);
 }
 
 void fetch_atoms(xcb_connection_t* xc);
 
-void xwayland_ready(struct wl_listener* listener, void* data) {
-    struct wlr_xcursor *xcursor;
-    xcb_connection_t *xc = xcb_connect(xwayland->display_name, NULL);
-    int err = xcb_connection_has_error(xc);
-    if (err) {
-        error("xcb connection error. failed with code {}",err);
-        return;
-    }
-
-    fetch_atoms(xc);
-
-    // assign the one and only seat
-    wlr_xwayland_set_seat(xwayland, Input::seat);
-
-    //Set the default XWayland cursor.
-    if ((xcursor = wlr_xcursor_manager_get_xcursor(Input::cursor_mgr, "default", 1)))
-        wlr_xwayland_set_cursor(xwayland,
-                xcursor->images[0]->buffer, xcursor->images[0]->width * 4,
-                xcursor->images[0]->width, xcursor->images[0]->height,
-                xcursor->images[0]->hotspot_x, xcursor->images[0]->hotspot_y);
-
-    xcb_disconnect(xc);
-}
 
 
 //XCB ATOM STUFF
@@ -292,10 +259,12 @@ std::map<xcb_atom_t, Atom> atoms;
 
 xcb_atom_t WM_CLIENT_LEADER = XCB_ATOM_NONE;
 
-xcb_window_t getLeader(xcb_window_t window) {
+wlr_xwayland* xwayland;
+
+
+xcb_window_t getXcbParent(xcb_window_t window) {
     xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
-    if(!WM_CLIENT_LEADER) return 0;
-    auto cookie = xcb_get_property(xc, 0, window, WM_CLIENT_LEADER, XCB_ATOM_ANY, 0, 2048);
+    auto cookie = xcb_get_property(xc, 0, window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
     auto reply = xcb_get_property_reply(xc, cookie, 0);
     if(!reply) return 0;
     xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
@@ -304,16 +273,52 @@ xcb_window_t getLeader(xcb_window_t window) {
     return 0;
 }
 
-// xcb_window_t getXcbParent(xcb_window_t window) {
-//     xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
-//     auto cookie = xcb_get_property(xc, 0, window, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_ANY, 0, 2048);
-//     auto reply = xcb_get_property_reply(xc, cookie, 0);
-//     if(!reply) return 0;
-//     xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
-//     free(reply);
-//     if(xid) return *xid;
-//     return 0;
-// }
+Surface::Parent* getParent(xcb_window_t window) {
+    Surface::Parent* parent = nullptr;
+
+    //METHOD 1: find a parent trough the parent property.
+    xcb_window_t parent_window = getXcbParent(window);
+
+    if(parent_window) {
+         auto surface = getSurface(getXcbParent(window), false);
+
+        switch(surface->type) {
+            case XWAYLAND_UNASSOCIATED: break;
+            case XWAYLAND_TOPLEVEL:
+                parent = surface->toplevel;
+                break;
+            case XWAYLAND_POPUP:
+                parent = surface->popup;
+                break;
+            default:
+                warn("unhandled xwayland surfacec type!");
+        }
+    }
+
+    if(parent) return parent;
+
+    //FALLBACK METHOD: find a parent trough the leader property.
+    auto leader = getLeader(window, false);
+    if(leader) {
+        switch(leader->type) {
+            case XWAYLAND_UNASSOCIATED:
+                assert(leader->fallback->toplevel);
+                parent = leader->fallback->toplevel;
+            break;
+            case XWAYLAND_TOPLEVEL:
+                parent = leader->toplevel;
+                break;
+            case XWAYLAND_POPUP:
+                parent = leader->popup;
+                break;
+            default:
+                warn("unhandled xwayland surfacec type!");
+        }
+    }
+    
+    if(!parent) error("no parent found for xwayland popup {}", window);
+    return parent;
+}
 
 std::set<Atom> getAtoms(xcb_atom_t* atom_array, size_t size) {
     std::set<Atom> a;
@@ -329,6 +334,29 @@ XWaylandWindowType getXWaylandWindowType(wlr_xwayland_surface* surface) {
     //printSet(a); //debug
     if(a.find(NET_WM_WINDOW_TYPE_POPUP_MENU) != a.end()) return XWAYLAND_POPUP;
     return XWAYLAND_TOPLEVEL;
+}
+
+
+XWaylandSurface* getLeader(xcb_window_t window_id, bool create) {
+    xcb_connection_t* xc = wlr_xwayland_get_xwm_connection(xwayland);
+    if(!WM_CLIENT_LEADER) {
+        error("Client Leader Atom not found");
+        return nullptr;
+    }
+    auto cookie = xcb_get_property(xc, 0, window_id, WM_CLIENT_LEADER, XCB_ATOM_ANY, 0, 2048);
+    auto reply = xcb_get_property_reply(xc, cookie, 0);
+    if(!reply) {
+        error("window {} has no leader", window_id);
+        return nullptr;
+    }
+    xcb_window_t* xid = (xcb_window_t*) xcb_get_property_value(reply);
+    free(reply);
+    if(!xid) {
+        error("window {} has no leader", window_id);
+        return nullptr;
+    }
+
+    return getSurface(*xid, create);
 }
 
 void fetch_atoms(xcb_connection_t* xc) {
@@ -349,6 +377,33 @@ void fetch_atoms(xcb_connection_t* xc) {
 }
 
 //TODO: xcb / xwayland selber implemente
+
+void xwayland_ready(struct wl_listener* listener, void* data) {
+    struct wlr_xcursor *xcursor;
+    xcb_connection_t *xc = xcb_connect(xwayland->display_name, NULL);
+    int err = xcb_connection_has_error(xc);
+    if (err) {
+        error("xcb connection error. failed with code {}",err);
+        return;
+    }
+
+    fetch_atoms(xc);
+
+    // assign the one and only seat
+    wlr_xwayland_set_seat(xwayland, Input::seat);
+
+    //Set the default XWayland cursor.
+    if ((xcursor = wlr_xcursor_manager_get_xcursor(Input::cursor_mgr, "default", 1)))
+        wlr_xwayland_set_cursor(xwayland,
+                xcursor->images[0]->buffer, xcursor->images[0]->width * 4,
+                xcursor->images[0]->width, xcursor->images[0]->height,
+                xcursor->images[0]->hotspot_x, xcursor->images[0]->hotspot_y);
+
+    xcb_disconnect(xc);
+}
+
+wl_listener new_xwayland_surface;
+wl_listener xwayland_ready_listener;
 
 }
 

@@ -15,6 +15,7 @@ int main() {
 		spawn("konsole");
 	});
 
+	//FIXME: das gaht nöd wenn es xwayland fenster offe isch
 	Input::registerKeyCallback(XKB_KEY_Q, WLR_MODIFIER_LOGO | WLR_MODIFIER_SHIFT, [](xkb_keysym_t sym, uint32_t modmask){
 		Server::connected = false;
 	});
