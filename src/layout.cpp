@@ -62,18 +62,21 @@ class TilingLayout {
     }
 
     void updateLayout(Extends &extends) {
-        debug("Update layout: Extends={}", extends);
         const uint n = surfaces.size();
+        debug("Update layout: n={}; Extends={}", n, extends);
         if(n == 0) return;
         const uint h = extends.width / n;
         auto i = surfaces.begin();
-        wlr_box ext = extends;
+        Extends ext = extends;
         ext.width = extends.width - (n-1)*h;
+        debug("Update layout surface: Extends={}", ext);
         (*i)->setExtends(ext);
         (*i)->setAvailableArea(extends); //TODO: suboptimal das musi zu desktop schiebe
-        ext.x += extends.width - (n-1)*h;
+        ext.x += ext.width;
+        ext.width = h;
         i++;
         while(i != surfaces.end()) {
+            debug("Update layout surface: Extends={}", ext);
             (*i)->setExtends(ext);
             (*i)->setAvailableArea(extends);
             ext.x += h;

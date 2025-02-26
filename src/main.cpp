@@ -15,6 +15,10 @@ int main() {
 		spawn("konsole");
 	});
 
+	Input::registerKeyCallback(XKB_KEY_p, WLR_MODIFIER_LOGO, [](xkb_keysym_t sym, uint32_t modmask){
+		spawn("vlc");
+	});
+
 	Input::registerKeyCallback(XKB_KEY_q, WLR_MODIFIER_LOGO, [](xkb_keysym_t sym, uint32_t modmask){
 		Layout::killClient();
 	});
