@@ -56,6 +56,8 @@ namespace Surface {
         std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
         virtual wlr_surface* getSurface() = 0;
 
+        virtual void kill() = 0;
+
         protected:
         Toplevel();
         virtual ~Toplevel() = default;

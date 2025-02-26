@@ -41,6 +41,10 @@ class XwaylandToplevel : public Surface::Toplevel {
     wlr_surface* getSurface() {
         return xwayland_surface->surface;
     }
+
+    void kill() {
+        wlr_xwayland_surface_close(xwayland_surface);
+    }
 };
 
 //TODO: add option for rearrange

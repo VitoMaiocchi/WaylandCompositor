@@ -24,6 +24,10 @@ class XdgToplevel : public Surface::Toplevel {
         return xdg_toplevel->base->surface;
     }
 
+    void kill() {
+        wlr_xdg_toplevel_send_close(xdg_toplevel);
+    }
+
     public:
     XdgToplevel(wlr_xdg_toplevel* xdg_toplevel) {
         this->xdg_toplevel = xdg_toplevel;

@@ -127,6 +127,7 @@ namespace Input {
         return ((uint64_t)modmask << 32) | sym;
     }
 
+    //TODO: fix das wenn mer shift mod mask macht aber nöd capitalized.
     //TODO: add repeat option: if key is held pressed it is triggered multiple times
     void registerKeyCallback(xkb_keysym_t sym, uint32_t modmask, ShortcutCallback callback) {
         shortcut_callbacks[getShortCutHash(sym, modmask)] = callback;

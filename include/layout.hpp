@@ -12,6 +12,7 @@ namespace Layout {
     void removeSurface(Surface::Toplevel* surface);
     void handleCursorMovement(const double x, const double y);
     void setDesktop(uint desktop);
+    void killClient();
 
     class Display;
 }

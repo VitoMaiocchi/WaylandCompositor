@@ -110,6 +110,10 @@ class Desktop {
         focused_toplevel->setFocus(true);
     }
 
+    Surface::Toplevel* getFocusedSurface() {
+        return focused_toplevel;
+    }
+
     void addSurface(Surface::Toplevel* surface) {
         tilingLayout.addSurface(surface);
         tilingLayout.updateLayout(extends);
@@ -212,6 +216,10 @@ class Display {
         desktops[current_desktop].setVisibility(true);
         desktops[current_desktop].setFocus(true);
     }
+
+    Surface::Toplevel* getFocusedSurface() {
+        return desktops[current_desktop].getFocusedSurface();
+    }
 };
 
 std::list<Display*> displays;
@@ -249,6 +257,14 @@ void handleCursorMovement(const double x, const double y) {
 
 void setDesktop(uint desktop) {
     getFocusedDisplay()->setDesktop(desktop);
+}
+
+void killClient() {
+    warn("KILL CLIENT");
+    const auto display = getFocusedDisplay();
+    if(!display) return;
+    const auto s = display->getFocusedSurface();
+    if(s) s->kill();
 }
 
 }
