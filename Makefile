@@ -12,7 +12,8 @@ LIBS=-L/usr/lib \
 	 $(shell pkg-config --cflags --libs cairo) \
 	 $(shell pkg-config --cflags --libs xcb) \
 	 $(shell pkg-config --cflags --libs libpulse) \
-	 $(shell pkg-config --cflags --libs libspa-0.2 libpipewire-0.3 wireplumber-0.5)
+	 $(shell pkg-config --cflags --libs libspa-0.2 libpipewire-0.3 wireplumber-0.5) \
+	 $(shell pkg-config --libs wayland-server)
 
 FLAGS=$(CFLAGS) -g -O0 -Wall -I/usr/include/pixman-1 -I. -I./include -I/usr/include/wlroots-0.18 -DWLR_USE_UNSTABLE \
 	$(shell pkg-config --cflags libspa-0.2 libpipewire-0.3 wireplumber-0.5)
@@ -25,9 +26,19 @@ END=\033[0m
 
 #generate C headers for Wayland Protocols
 include/xdg-shell-protocol.h:
-	@echo -e "$(BLUE)Generating XDG shell protocol...$(END)"
+	@echo -e "$(BLUE)Generating XDG shell protocol header...$(END)"
 	$(WAYLAND_SCANNER) server-header \
 		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
+
+protocols/xdg-shell-protocol.c:
+	@echo -e "$(BLUE)Generating XDG shell protocol code...$(END)"
+	$(WAYLAND_SCANNER) private-code \
+		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml $@
+
+build/protocols/xdg-shell-protocol.o: protocols/xdg-shell-protocol.c
+	@echo -e "$(BLUE)Compiling XDG shell protocol code...$(END)"
+	@mkdir -p build/protocols
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 include/wlr-layer-shell-unstable-v1-protocol.h:
 	@echo -e "$(BLUE)Generating LayerShell protocol...$(END)"
@@ -45,7 +56,7 @@ build/%.o: src/%.cpp $(HEADERS) include/xdg-shell-protocol.h include/wlr-layer-s
 	@echo -e "$(YELLOW)Compiling $<...$(END)"
 	$(CXX) -c $< -o $@ $(FLAGS) -std=$(CXX_STANDARD)
 
-VitoWM: $(OBJS)
+VitoWM: $(OBJS) build/protocols/xdg-shell-protocol.o
 	@echo -e "$(GREEN)Linking Final Executable...$(END)"
 	$(CXX) -o VitoWM $^ $(LIBS) -std=$(CXX_STANDARD)
 
