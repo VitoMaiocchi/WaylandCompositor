@@ -10,23 +10,27 @@
 
 namespace Layout {
 
-/*
-Surface::Toplevel* focused_toplevel;
+template <typename IteratorType>
+class TilingLayout {
+    public:
+    typedef IteratorType Iterator;
 
-void inline setFocus(Surface::Toplevel* surface) {
-    if(!surface) return;
-    if(focused_toplevel) {
-        if(focused_toplevel == surface) return;
-        focused_toplevel->setFocus(false);
-        focused_toplevel = surface;
+    virtual void addSurface(Surface::Toplevel* surface) = 0;
+    virtual Surface::Toplevel* removeSurface(Surface::Toplevel* surface) = 0;
+    virtual Surface::Toplevel* getSurfaceAtLocation(const double x, const double y, Surface::Toplevel* include_children) = 0;
+    virtual void updateLayout(Extends &extends) = 0;
+    virtual Iterator begin() = 0;
+    virtual Iterator end() = 0;
+
+    void setVisible(bool visibility) {
+        for(auto it = begin(); it != end(); it++) {
+            (*it)->setVisibility(visibility);
+        }
     }
-    focused_toplevel = surface;
-    surface->setFocus(true);
-}
-*/
+};
 
 //TODO: das chammer abstract mache für meh tiling layouts
-class TilingLayout {
+class HorizontalTilingLayout : public TilingLayout<std::list<Surface::Toplevel*>::iterator> {
     std::list<Surface::Toplevel*> surfaces;
 
     public:
@@ -43,10 +47,6 @@ class TilingLayout {
         if(surfaces.begin() == surfaces.end()) return nullptr;
         if(it != surfaces.end()) return *it;
         else return *surfaces.begin();
-    }
-
-    void setVisible(bool visibility) {
-        for(auto surface : surfaces) surface->setVisibility(visibility);
     }
 
     Surface::Toplevel* getSurfaceAtLocation(const double x, const double y, Surface::Toplevel* include_children) {
@@ -84,19 +84,17 @@ class TilingLayout {
         }
     };
 
-    typedef std::list<Surface::Toplevel*>::iterator iterator;
-
-    iterator begin() {
+    Iterator begin() {
         return surfaces.begin();
     }
 
-    iterator end() {
+    Iterator end() {
         return surfaces.end();
     }
 };
 
 class Desktop {
-    TilingLayout tilingLayout;
+    HorizontalTilingLayout tilingLayout;
     Extends extends;
     Surface::Toplevel* focused_toplevel = nullptr;
     bool focused = false;
