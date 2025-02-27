@@ -29,8 +29,8 @@ class TilingLayout {
     }
 };
 
-//TODO: das chammer abstract mache für meh tiling layouts
-class HorizontalTilingLayout : public TilingLayout<std::list<Surface::Toplevel*>::iterator> {
+class LinearTilingLayout : public TilingLayout<std::list<Surface::Toplevel*>::iterator> {
+    protected:
     std::list<Surface::Toplevel*> surfaces;
 
     public:
@@ -61,6 +61,19 @@ class HorizontalTilingLayout : public TilingLayout<std::list<Surface::Toplevel*>
         return nullptr;
     }
 
+    Iterator begin() {
+        return surfaces.begin();
+    }
+
+    Iterator end() {
+        return surfaces.end();
+    }
+
+    virtual void updateLayout(Extends &extends) = 0;
+};
+
+class HorizontalTilingLayout : public LinearTilingLayout {
+    public:
     void updateLayout(Extends &extends) {
         const uint n = surfaces.size();
         debug("Update layout: n={}; Extends={}", n, extends);
@@ -83,14 +96,6 @@ class HorizontalTilingLayout : public TilingLayout<std::list<Surface::Toplevel*>
             i++;
         }
     };
-
-    Iterator begin() {
-        return surfaces.begin();
-    }
-
-    Iterator end() {
-        return surfaces.end();
-    }
 };
 
 class Desktop {
