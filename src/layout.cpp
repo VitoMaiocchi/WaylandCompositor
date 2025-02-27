@@ -98,8 +98,105 @@ class HorizontalTilingLayout : public LinearTilingLayout {
     };
 };
 
+class DoubleCollumnTilingLayout : public TilingLayout<std::vector<Surface::Toplevel*>::iterator> {
+    std::vector<Surface::Toplevel*> surfaces;
+    uint middle_index = 0;
+    uint size = 0;
+
+    public:
+    void addSurface(Surface::Toplevel* surface) {
+        assert(middle_index <= size);
+        assert(size == surfaces.size()); //only debug
+        bool second = middle_index > size / 2;
+        if(second) {
+            surfaces.push_back(surface);
+        } else {
+            surfaces.insert(surfaces.begin() + middle_index, surface);
+            middle_index++;
+        }
+        size++;
+    }
+
+    Surface::Toplevel* removeSurface(Surface::Toplevel* surface) {
+        assert(size != 0);
+        auto it = std::find(surfaces.begin(), surfaces.end(), surface);
+        assert(it != surfaces.end());
+
+        if(it < surfaces.begin() + middle_index) middle_index--;
+
+        it = surfaces.erase(it);
+
+        size--;
+        if(surfaces.begin() == surfaces.end()) return nullptr;
+        if(it != surfaces.end()) return *it;
+        else return *surfaces.begin();
+
+    }
+
+    Surface::Toplevel* getSurfaceAtLocation(const double x, const double y, Surface::Toplevel* include_children) {
+        if(include_children) {
+            auto it = std::find(surfaces.begin(), surfaces.end(), include_children);
+            assert(it != surfaces.end());
+            if((*it)->contains(x,y,true)) return include_children; 
+        }
+
+        //it checks include_children twice but I can live with that
+        for(auto s : surfaces) if(s->contains(x,y, false)) return s;
+        return nullptr;
+    }
+
+    Iterator begin() {
+        return surfaces.begin();
+    }
+
+    Iterator end() {
+        return surfaces.end();
+    }
+
+    void updateCollumn(Extends extends, uint start, uint end) {
+        const uint n = end - start;
+        debug("Update layout: n={}; Extends={}", n, extends);
+        if(n == 0) return;
+        const uint h = extends.height / n;
+        auto i = start;
+        Extends ext = extends;
+        ext.height = extends.height - (n-1)*h;
+        debug("Update layout surface: Extends={}", ext);
+        surfaces[i]->setExtends(ext);
+        ext.y += ext.height;
+        ext.height = h;
+        i++;
+        while(i < end) {
+            debug("Update layout surface: Extends={}", ext);
+            surfaces[i]->setExtends(ext);
+            ext.y += h;
+            i++;
+        }
+    }
+
+    void updateLayout(Extends &extends) {
+        if(size == 0) return;
+        for(auto s : surfaces) s->setAvailableArea(extends); //TODO: suboptimal das musi zu desktop schiebe
+        int m = extends.width / 2;
+        if(middle_index == size) m = extends.width;
+        else if(middle_index == 0) m = 0;
+        updateCollumn({
+            extends.x,
+            extends.y,
+            m,
+            extends.height
+        }, 0, middle_index);
+        updateCollumn({
+            extends.x + m,
+            extends.y,
+            extends.width - m,
+            extends.height
+        }, middle_index, size);
+    };
+};
+
 class Desktop {
-    HorizontalTilingLayout tilingLayout;
+    DoubleCollumnTilingLayout tilingLayout;
     Extends extends;
     Surface::Toplevel* focused_toplevel = nullptr;
     bool focused = false;
