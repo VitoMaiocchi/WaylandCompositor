@@ -2,6 +2,7 @@
 #include "util.hpp"
 #include "input.hpp"
 #include "layout.hpp"
+#include "launcher.hpp"
 
 //TODO: mer chönt da theoretisch no en 10 desktop adde
 void change_desktop(xkb_keysym_t sym, uint32_t modmask) {
@@ -46,5 +47,6 @@ int main() {
 		Output::muteVolume();
 	});
 
+	Launcher::setup();
 	Server::setup();
 }

@@ -107,10 +107,10 @@ namespace Logger {
 
 #ifdef LOGGER_CATEGORY
 #define log(importance, message, ...) \
-    Logger::log_message(std::format(message, ##__VA_ARGS__), importance, LOGGER_CATEGORY, _WLR_FILENAME, __LINE__)
+    Logger::log_message(std::format(message, ##__VA_ARGS__), importance, LOGGER_CATEGORY, __FILE__, __LINE__)
 #else
 #define log(importance, message, ...) \
-    Logger::log_message(std::format(message, ##__VA_ARGS__), importance, Logger::UNCATEGORIZED, _WLR_FILENAME, __LINE__)
+    Logger::log_message(std::format(message, ##__VA_ARGS__), importance, Logger::UNCATEGORIZED, __FILE__, __LINE__)
 #endif
 
 #define debug(message, ...) \
