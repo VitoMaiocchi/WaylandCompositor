@@ -15,6 +15,7 @@ class XwaylandToplevel : public Surface::Toplevel {
 
     public:
     XwaylandToplevel(wlr_xwayland_surface* xwayland_surface) {
+        debug("NEW XWAYLAND TOPLEVEL");
         this->xwayland_surface = xwayland_surface;
         root_node = wlr_scene_tree_create(&Output::scene->tree);
         xwayland_surface->data = this;
@@ -72,6 +73,15 @@ class XwaylandPopup : public Surface::Child {
 
     ~XwaylandPopup() {
         wlr_scene_node_destroy(&root_node->node);
+        /*
+        FIXME: da isch es mal abgschtürzt
+        #0  0x00007ffff7ed15b3 in wlr_scene_node_destroy () from /usr/lib/libwlroots-0.18.so
+        #1  0x0000555555586657 in (anonymous namespace)::XwaylandPopup::~XwaylandPopup (this=0x555556652540) at src/surface/xwayland.cpp:75
+        #2  0x0000555555586689 in (anonymous namespace)::XwaylandPopup::~XwaylandPopup (this=0x555556652540) at src/surface/xwayland.cpp:74
+        #3  0x00005555555868d3 in (anonymous namespace)::new_xwayland_surface_notify(wl_listener*, void*)::$_2::operator()(wl_listener*, void*) const (this=0x7fffffffe1f7, listener=0x55555663fdf0, data=0x0) at src/surface/xwayland.cpp:186
+        #4  0x000055555558681e in (anonymous namespace)::new_xwayland_surface_notify(wl_listener*, void*)::$_2::__invoke(wl_listener*, void*) (listener=0x55555663fdf0, data=0x0) at src/surface/xwayland.cpp:177
+        */
+
     }
 };
 

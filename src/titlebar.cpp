@@ -25,6 +25,12 @@ bool has_bat = false;
 std::string ac_path = "";
 std::string bat_path = "";
 
+std::string debug_text;
+
+void Titlebar::updateDebugText(std::string s) {
+    debug_text = s;
+}
+
 void Titlebar::updateVolume(uint volume_percent) {
     volume = volume_percent;
     if(volume_muted) volume_text = "Volume: muted";
@@ -97,7 +103,7 @@ void draw(cairo_t* cr, uint desktop) {
 	cairo_set_font_size (cr, 20.0);
 
     std::string text = current_time +"   Desktop: "+ std::to_string(desktop+1)+
-        "   "+battery_status + "   "+volume_text;
+        "   "+battery_status + "   "+volume_text+" "+debug_text;
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_move_to (cr, 20.0, 25.0);

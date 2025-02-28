@@ -13,6 +13,7 @@ class Titlebar {
     static int update_titlebars(void* data);
     static void updateVolume(uint volume_percent);
     static void updateAudioMute(bool muted);
+    static void updateDebugText(std::string s);
 
     private:
     void drawBuffer();

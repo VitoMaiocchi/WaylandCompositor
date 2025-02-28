@@ -13,7 +13,10 @@ class XdgToplevel : public Surface::Toplevel {
     struct wlr_xdg_toplevel* xdg_toplevel;
 
     void setSurfaceSize(uint width, uint height) {
-        wlr_xdg_toplevel_set_size(xdg_toplevel, width, height);
+        assert(width >= 0 && height >= 0);
+        xdg_toplevel->scheduled.width = width;
+        xdg_toplevel->scheduled.height = height;
+        wlr_xdg_surface_schedule_configure(xdg_toplevel->base);
     }
 
     void setActivated(bool activated) {
@@ -30,6 +33,7 @@ class XdgToplevel : public Surface::Toplevel {
 
     public:
     XdgToplevel(wlr_xdg_toplevel* xdg_toplevel) {
+        debug("NEW XDG TOPLEVEL");
         this->xdg_toplevel = xdg_toplevel;
         xdg_toplevel->base->surface->data = this;
         root_node = wlr_scene_tree_create(&Output::scene->tree);
@@ -42,6 +46,15 @@ class XdgToplevel : public Surface::Toplevel {
 
     void map_event(bool map) {
         mapNotify(map);
+    }
+
+    std::pair<int, int> surfaceCoordinateTransform(int x, int y) const {
+        wlr_box box;
+        wlr_xdg_surface_get_geometry(xdg_toplevel->base, &box);
+        auto p = Surface::Toplevel::surfaceCoordinateTransform(x,y);
+        p.first += box.x;
+        p.second += box.y;
+        return p;
     }
 };
 
@@ -66,7 +79,8 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
             //CONFIGURE LISTENERS
     listeners->map.notify = [](struct wl_listener* listener, void* data) {
         xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, map);
-        listeners->surface->map_event(true);
+        //listeners->surface->map_event(true);
+        //TODO: clean this up
     };
 
     listeners->unmap.notify = [](struct wl_listener* listener, void* data) {
@@ -91,6 +105,8 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
 
         if(!toplevel->base->initial_commit) return;
         assert(toplevel->base->initialized);
+
+        listeners->surface->map_event(true);
 
         wlr_xdg_toplevel_decoration_v1* dec = (wlr_xdg_toplevel_decoration_v1*) toplevel->base->data;
         if(!dec) return; //TODO: add full support for fullscreen: okular presentation mode

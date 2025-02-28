@@ -53,7 +53,7 @@ namespace Surface {
         void setVisibility(bool visible);
 
         void setAvailableArea(Extends ext);
-        std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
+        virtual std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
         virtual wlr_surface* getSurface() = 0;
 
         virtual void kill() = 0;
