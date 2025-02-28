@@ -11,23 +11,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-inline void addFile(const fs::directory_entry &entry, std::list<fs::path> &files) {
-    //".desktop";
-    if(!entry.is_regular_file()) return;
-    const auto filename = entry.path().filename().generic_string();
-    const uint N = filename.size();
-    if(N < 9) return;
-    if(filename.substr(filename.size()-8,8) != ".desktop") return;
-    files.push_back(entry);
-}
-
-std::list<fs::path> getApplicationEntries() {
-    std::list<fs::path> files;
-    for (const auto &entry : fs::directory_iterator("/usr/share/applications")) addFile(entry, files);
-    for (const auto &entry : fs::directory_iterator(
-        std::string(std::getenv("HOME"))+"/.local/share/applications")) addFile(entry, files);
-    return files;
-}
+typedef std::unordered_map<std::string, std::string> Fields;
 
 //returns false if the files stream ended
 bool nextLine(std::ifstream &file) {
@@ -38,7 +22,7 @@ bool nextLine(std::ifstream &file) {
     return false;
 }
 
-bool parseField(std::ifstream &file, std::unordered_map<std::string, std::string> &fields) {
+bool parseField(std::ifstream &file, Fields &fields) {
     if(file.peek() == '#') return nextLine(file);
 
     char next;
@@ -55,11 +39,11 @@ bool parseField(std::ifstream &file, std::unordered_map<std::string, std::string
         value.push_back(next);
     }
 
-    std::cout << "key=" << key << "; value=" << value << ";" << std::endl;
+    fields[key] = value;
     return true;
 }
 
-bool parseDesktopEntry(std::ifstream &file) {
+bool parseDesktopEntry(std::ifstream &file, std::list<Fields> &application_entries) {
     //get entry type
     while(file.peek() != '[') if(!nextLine(file)) return false;
     if(!file.get()) return false;
@@ -73,32 +57,49 @@ bool parseDesktopEntry(std::ifstream &file) {
     }
     
     if(!nextLine(file)) return false;
-
-    std::cout << name << std::endl;
     if(name != "Desktop Entry") return true;
-
-    std::unordered_map<std::string, std::string> fields; //mit dem passiert no nüt
-    while(file.peek() != '[') if(!parseField(file, fields)) return false;
+    application_entries.push_front({});
+    while(file.peek() != '[') if(!parseField(file, (*application_entries.begin()) )) return false;
     return true;
 }
 
-void parseFile(fs::path &file_path) {
+void parseFile(const fs::path &file_path, std::list<Fields> &application_entries) {
     std::ifstream file(file_path.string());
     if (!file.is_open()) {
         error("failed to open file: {}", file_path.filename().string());
         return;
     }
 
-    while(parseDesktopEntry(file));
-
+    while(parseDesktopEntry(file, application_entries));
     if(!file.eof()) warn("end of file not reached: {}", file_path.filename().string());
+}
+
+inline void addFile(const fs::directory_entry &entry, std::list<Fields> &application_entries) {
+    //".desktop";
+    if(!entry.is_regular_file()) return;
+    const auto filename = entry.path().filename().generic_string();
+    const uint N = filename.size();
+    if(N < 9) return;
+    if(filename.substr(filename.size()-8,8) != ".desktop") return;
+    parseFile(entry.path(), application_entries);
+}
+
+std::list<Fields> getApplicationEntries() {
+    std::list<Fields> application_entries;
+    for (const auto &entry : fs::directory_iterator("/usr/share/applications")) addFile(entry, application_entries);
+    for (const auto &entry : fs::directory_iterator(
+        std::string(std::getenv("HOME"))+"/.local/share/applications")) addFile(entry, application_entries);
+    return application_entries;
 }
 
 }
 
 namespace Launcher {
     void setup() {
-        auto files = getApplicationEntries();
-        for(auto &file : files) parseFile(file);
+        auto application_entries = getApplicationEntries();
+        for(Fields fields : application_entries) {
+            std::cout << "\n\n[DESKTOP ENTRY]" << std::endl;
+            for(auto f : fields) std::cout << "key=" << f.first << "; value=" << f.second << ";" << std::endl;
+        }
     }
 }
