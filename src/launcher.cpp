@@ -1,3 +1,4 @@
+#define LOGGER_CATEGORY Logger::LAUNCHER
 #include "launcher.hpp"
 #include "util.hpp"
 #include "output.hpp"
@@ -171,6 +172,8 @@ std::list<ApplicationEntry> getApplicationEntries() {
     return entries;
 }
 
+std::string search_text;
+
 void draw(cairo_t* cr) {
 	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
 	cairo_paint(cr);
@@ -183,6 +186,8 @@ void draw(cairo_t* cr) {
 	cairo_set_source_rgb(cr, 0, 0, 0);
 	cairo_move_to (cr, 20.0, 25.0);
 	cairo_show_text (cr, text.c_str());
+    cairo_move_to(cr, 20, 60);
+    cairo_show_text(cr, search_text.c_str());
 }
 
 }
@@ -209,12 +214,14 @@ namespace Launcher {
 
     bool running = false;
     Output::Buffer* buffer = nullptr;
+    Extends ext;
 
     void run() {
         assert(!running);
         running = true;
+        search_text = "kys";
         buffer = new Output::Buffer();
-        Extends ext = Layout::getActiveDisplayDimensions();
+        ext = Layout::getActiveDisplayDimensions();
         ext = {
             ext.x + ext.width/4,
             ext.y + ext.height/4,
@@ -226,10 +233,25 @@ namespace Launcher {
     }
 
     void keyPressEvent(xkb_keysym_t sym) {
-        if(sym == XKB_KEY_Escape) {
-            delete buffer;
-            buffer = nullptr;
-            running = false;
+        warn("Keypress Event sym={}", (char)sym);
+        switch(sym) {
+            case XKB_KEY_Escape:
+                delete buffer;
+                buffer = nullptr;
+                running = false;
+            break;
+            case XKB_KEY_BackSpace:
+                warn("Keypress Event sym=backspace");
+                if(search_text.size() == 0) break;
+                search_text.erase(search_text.end()-1);
+                buffer->draw(draw, ext);
+            break;
+            default:
+                if (sym < 0x20 || sym > 0xfff) break;
+                warn("Keypress Event text");
+                search_text += sym;
+                buffer->draw(draw, ext);
+            break;
         }
     }
 

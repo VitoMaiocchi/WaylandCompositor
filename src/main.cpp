@@ -12,6 +12,10 @@ void change_desktop(xkb_keysym_t sym, uint32_t modmask) {
 
 int main() {
 
+	Input::registerKeyCallback(XKB_KEY_b, WLR_MODIFIER_LOGO, [](xkb_keysym_t sym, uint32_t modmask){
+		if(!Launcher::isRunning()) Launcher::run();
+	});
+
 	Input::registerKeyCallback(XKB_KEY_space, WLR_MODIFIER_LOGO, [](xkb_keysym_t sym, uint32_t modmask){
 		if(!Launcher::isRunning()) Launcher::run();
 	});

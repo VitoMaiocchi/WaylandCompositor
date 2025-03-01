@@ -75,7 +75,7 @@ namespace Logger {
         SILENT,
     };
 
-    enum Category {
+    enum Category { //die immer au im util.cpp update
         WL_ROOTS,
         SURFACE,
         INPUT,
@@ -83,6 +83,7 @@ namespace Logger {
         LAYOUT,
         UNCATEGORIZED,
         SERVER,
+        LAUNCHER,
         categories_len
     };
 
@@ -93,7 +94,8 @@ namespace Logger {
        DEBUG, //output
        ERROR, //layout
        DEBUG, //uncategorized
-       INFO //server
+       INFO, //server
+       DEBUG //launcher
     };
 
     void setup();

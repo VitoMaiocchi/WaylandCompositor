@@ -18,14 +18,15 @@ namespace Logger {
         "ERROR"
     };
 
-    const char* category_text[categories_len] = {
+    const char* category_text[] = {
         " - wl-roots",
         " - surface",
         " - input",
         " - output",
         " - layout",
         "",
-        " - wayland-server"
+        " - wayland-server",
+        " - launcher"
     };
 
     void print_message(std::string message, Importance importance, Category category, const char* file, int line) {
