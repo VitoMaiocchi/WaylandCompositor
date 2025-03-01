@@ -23,7 +23,8 @@ bool nextLine(std::ifstream &file) {
 }
 
 bool parseField(std::ifstream &file, Fields &fields) {
-    if(file.peek() == '#') return nextLine(file);
+    const char p = file.peek();
+    if(p == '#' || p == '\n' || p == ' ') return nextLine(file);
 
     char next;
     std::string key = "";
@@ -172,6 +173,12 @@ std::list<ApplicationEntry> getApplicationEntries() {
 
 namespace Launcher {
     void setup() {
+        // auto application_entries = getUnprocessedApplicationEntries();
+        // for(Fields fields : application_entries) {
+        //     std::cout << "\n\n[DESKTOP ENTRY]" << std::endl;
+        //     for(auto f : fields) std::cout << "key=" << f.first << "; value=" << f.second << ";" << std::endl;
+        // }
+
         auto entries = getApplicationEntries();
         for(ApplicationEntry &entry : entries) {
             std::cout << std::format("\n[Desktop Entry]\nname={}\ngeneric_name={}\nexec={}\nsearch_terms={}\nterminal={}",
