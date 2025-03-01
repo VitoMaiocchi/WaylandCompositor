@@ -36,7 +36,6 @@ class XdgToplevel : public Surface::Toplevel {
         debug("NEW XDG TOPLEVEL");
         this->xdg_toplevel = xdg_toplevel;
         xdg_toplevel->base->surface->data = this;
-        root_node = wlr_scene_tree_create(&Output::scene->tree);
         surface_node = wlr_scene_xdg_surface_create(root_node, xdg_toplevel->base);
     }
 

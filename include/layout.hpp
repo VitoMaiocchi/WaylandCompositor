@@ -14,6 +14,8 @@ namespace Layout {
     void setDesktop(uint desktop);
     void killClient();
 
+    Extends getActiveDisplayDimensions();
+
     class Display;
 }
 

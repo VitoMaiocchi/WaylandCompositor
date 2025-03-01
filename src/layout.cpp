@@ -323,6 +323,10 @@ class Display {
     Surface::Toplevel* getFocusedSurface() {
         return desktops[current_desktop].getFocusedSurface();
     }
+
+    Extends getExtends() {
+        return extends;
+    }
 };
 
 std::list<Display*> displays;
@@ -368,6 +372,10 @@ void killClient() {
     if(!display) return;
     const auto s = display->getFocusedSurface();
     if(s) s->kill();
+}
+
+Extends getActiveDisplayDimensions() {
+    return getFocusedDisplay()->getExtends();
 }
 
 }

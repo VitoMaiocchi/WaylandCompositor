@@ -1,5 +1,7 @@
 #include "launcher.hpp"
 #include "util.hpp"
+#include "output.hpp"
+#include "layout.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -169,6 +171,20 @@ std::list<ApplicationEntry> getApplicationEntries() {
     return entries;
 }
 
+void draw(cairo_t* cr) {
+	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
+	cairo_paint(cr);
+
+	cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+	cairo_set_font_size (cr, 20.0);
+
+    std::string text = "LAUNCHER";
+
+	cairo_set_source_rgb(cr, 0, 0, 0);
+	cairo_move_to (cr, 20.0, 25.0);
+	cairo_show_text (cr, text.c_str());
+}
+
 }
 
 namespace Launcher {
@@ -189,5 +205,35 @@ namespace Launcher {
                 entry.terminal
             ) << std::endl;
         }
+    }
+
+    bool running = false;
+    Output::Buffer* buffer = nullptr;
+
+    void run() {
+        assert(!running);
+        running = true;
+        buffer = new Output::Buffer();
+        Extends ext = Layout::getActiveDisplayDimensions();
+        ext = {
+            ext.x + ext.width/4,
+            ext.y + ext.height/4,
+            ext.width / 2,
+            ext.height / 2
+        };
+
+        buffer->draw(draw, ext);
+    }
+
+    void keyPressEvent(xkb_keysym_t sym) {
+        if(sym == XKB_KEY_Escape) {
+            delete buffer;
+            buffer = nullptr;
+            running = false;
+        }
+    }
+
+    bool isRunning() {
+        return running;
     }
 }

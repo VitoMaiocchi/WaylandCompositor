@@ -89,4 +89,5 @@ namespace Surface {
 
     void setupXdgShell();
     void setupXWayland();
+    void setup();
 }

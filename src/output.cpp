@@ -217,7 +217,7 @@ namespace Output {
 	}
 
 	Buffer::~Buffer() {
-		//TODO
+		wlr_scene_node_destroy(&scene_buffer->node);
 	}
 
 	void Buffer::draw(std::function<void(cairo_t*)> draw, Extends ext) {

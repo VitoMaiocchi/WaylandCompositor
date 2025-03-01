@@ -3,6 +3,7 @@
 #include "layout.hpp"
 #include "server.hpp"
 #include "output.hpp"
+#include "launcher.hpp"
 #include <map>
 
 namespace Input {
@@ -175,15 +176,20 @@ namespace Input {
             }
         }
 
-        if (!handled) {
-            /* Otherwise, we pass it along to the client. */
-            assert(keyboard);
-            assert(keyboard->wlr_keyboard);
-            assert(seat);
-            wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
-            wlr_seat_keyboard_notify_key(seat, event->time_msec,
-                event->keycode, event->state);
+        if(handled) return;
+
+        if(Launcher::isRunning()) {
+            for (int i = 0; i < nsyms; i++) Launcher::keyPressEvent(syms[i]);
+            return;
         }
+
+        /* Otherwise, we pass it along to the client. */
+        assert(keyboard);
+        assert(keyboard->wlr_keyboard);
+        assert(seat);
+        wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
+        wlr_seat_keyboard_notify_key(seat, event->time_msec,
+            event->keycode, event->state);
     }
 
     static void keyboard_handle_destroy(struct wl_listener *listener, void *data) {

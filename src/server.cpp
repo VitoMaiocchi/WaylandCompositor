@@ -48,8 +48,7 @@ namespace Server {
 
 
         Output::setup();
-        Surface::setupXdgShell();
-        Surface::setupXWayland();
+        Surface::setup();
         Input::setup();
         Titlebar::setup();
 

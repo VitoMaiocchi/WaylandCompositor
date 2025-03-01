@@ -17,7 +17,6 @@ class XwaylandToplevel : public Surface::Toplevel {
     XwaylandToplevel(wlr_xwayland_surface* xwayland_surface) {
         debug("NEW XWAYLAND TOPLEVEL");
         this->xwayland_surface = xwayland_surface;
-        root_node = wlr_scene_tree_create(&Output::scene->tree);
         xwayland_surface->data = this;
     }
 

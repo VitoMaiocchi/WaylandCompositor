@@ -8,6 +8,8 @@
 
 namespace Surface {
 
+wlr_scene_tree* client_layer = nullptr;
+
 //BASE CLASS
 bool Base::contains(int x, int y) {
 	return extends.contains(x,y);
@@ -62,6 +64,7 @@ Toplevel::Toplevel() {
 	visible = false;
 	focused = false;
 	availableArea = extends;
+	root_node = wlr_scene_tree_create(client_layer);
 }
 
 Point Toplevel::getGlobalOffset() {
@@ -169,6 +172,12 @@ void Toplevel::mapNotify(bool mapped) {
 		wlr_scene_node_destroy(&border[i]->node);
 		border[i] = NULL;
 	}
+}
+
+void setup() {
+	client_layer = wlr_scene_tree_create(&Output::scene->tree);
+	setupXdgShell();
+	setupXWayland();
 }
 
 }
