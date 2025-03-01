@@ -84,7 +84,7 @@ inline void addFile(const fs::directory_entry &entry, std::list<Fields> &applica
     parseFile(entry.path(), application_entries);
 }
 
-std::list<Fields> getApplicationEntries() {
+std::list<Fields> getUnprocessedApplicationEntries() {
     std::list<Fields> application_entries;
     for (const auto &entry : fs::directory_iterator("/usr/share/applications")) addFile(entry, application_entries);
     for (const auto &entry : fs::directory_iterator(
@@ -92,14 +92,95 @@ std::list<Fields> getApplicationEntries() {
     return application_entries;
 }
 
+/*
+NoDisplay=true
+Name=KNewStuff Dialog
+Name=Foot
+GenericName=Terminal
+Exec=knewstuff-dialog6
+TryExec=nvim
+Exec=nvim %F
+Type=Application
+Terminal=false
+Keywords=shell;prompt;command;commandline;
+*/
+
+struct ApplicationEntry {
+    const std::string name;
+    const std::string generic_name;
+    const std::string exec;
+    const std::string search_terms;
+    const bool terminal;
+};
+
+void processEntry(const Fields& fields, std::list<ApplicationEntry> &entries) {
+    auto it = fields.find("NoDisplay");
+    if(it != fields.end() && it->second == "true") return; 
+
+    it = fields.find("Type");
+    if(it == fields.end()) return;
+    if(it->second != "Application") return;
+
+    it = fields.find("Name");
+    if(it == fields.end()) return;
+    std::string name = it->second;
+
+    it = fields.find("Exec");
+    if(it == fields.end()) return;
+    std::string exec = it->second;
+    uint N = exec.size();
+    if(N == 0) return;
+    for(size_t i = 0; i < N; i++) {
+        if(exec[i] == '%') {
+            exec[i] = ' ';
+            i++;
+            if(i < N) exec[i] = ' ';
+            i++;
+        }
+    }
+
+    it = fields.find("Terminal");
+    bool terminal = false;
+    if(it != fields.end() && it->second == "true") terminal = true;
+
+    it = fields.find("GenericName");
+    std::string generic_name = "";
+    if(it != fields.end()) generic_name = it->second;
+
+    std::string search_terms = name;
+    if(generic_name.size() > 0) search_terms += ";" + generic_name;
+    it = fields.find("Keywords");
+    if(it != fields.end() && it->second.size() > 0) search_terms += ";" + it->second;
+
+    entries.push_back({
+        name,
+        generic_name,
+        exec,
+        search_terms,
+        terminal
+    });
+}
+
+std::list<ApplicationEntry> getApplicationEntries() {
+    std::list<ApplicationEntry> entries;
+    auto application_entries = getUnprocessedApplicationEntries();
+    for(Fields &fields : application_entries) processEntry(fields, entries);
+    return entries;
+}
+
 }
 
 namespace Launcher {
     void setup() {
-        auto application_entries = getApplicationEntries();
-        for(Fields fields : application_entries) {
-            std::cout << "\n\n[DESKTOP ENTRY]" << std::endl;
-            for(auto f : fields) std::cout << "key=" << f.first << "; value=" << f.second << ";" << std::endl;
+        auto entries = getApplicationEntries();
+        for(ApplicationEntry &entry : entries) {
+            std::cout << std::format("\n[Desktop Entry]\nname={}\ngeneric_name={}\nexec={}\nsearch_terms={}\nterminal={}",
+                entry.name,
+                entry.generic_name,
+                entry.exec,
+                entry.search_terms,
+                entry.terminal
+            ) << std::endl;
         }
     }
 }
