@@ -90,7 +90,7 @@ namespace Logger {
     const Importance verbosity[categories_len] = {
        ERROR, //wlroots: hard coded
        DEBUG, //surface
-       WARNING, //input
+       DEBUG, //input
        DEBUG, //output
        ERROR, //layout
        DEBUG, //uncategorized

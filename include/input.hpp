@@ -14,7 +14,8 @@ namespace Input {
     void setup();
     void cleanup();
 
-    void registerKeyCallback(xkb_keysym_t sym, uint32_t modmask, ShortcutCallback callback);
+    void registerKeyCallback(xkb_keysym_t sym, uint32_t modmask, ShortcutCallback callback, bool repeat=false);
     void setCursorFocus(Surface::Toplevel* surface);
     void setKeyboardFocus(Surface::Toplevel* surface);
+    void sendTimer(uint ms);
 }

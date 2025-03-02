@@ -233,7 +233,7 @@ namespace Launcher {
     }
 
     void keyPressEvent(xkb_keysym_t sym) {
-        warn("Keypress Event sym={}", (char)sym);
+        debug("Keypress Event sym={}", (char)sym);
         switch(sym) {
             case XKB_KEY_Escape:
                 delete buffer;
@@ -241,14 +241,14 @@ namespace Launcher {
                 running = false;
             break;
             case XKB_KEY_BackSpace:
-                warn("Keypress Event sym=backspace");
+                debug("Keypress Event sym=backspace");
                 if(search_text.size() == 0) break;
                 search_text.erase(search_text.end()-1);
                 buffer->draw(draw, ext);
             break;
             default:
                 if (sym < 0x20 || sym > 0xfff) break;
-                warn("Keypress Event text");
+                debug("Keypress Event text");
                 search_text += sym;
                 buffer->draw(draw, ext);
             break;

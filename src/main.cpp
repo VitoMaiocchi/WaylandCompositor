@@ -45,11 +45,11 @@ int main() {
 
 	Input::registerKeyCallback(XKB_KEY_XF86AudioRaiseVolume, 0, [](xkb_keysym_t sym, uint32_t modmask){
 		Output::adjustVolume(0.02);
-	});
+	}, true);
 
 	Input::registerKeyCallback(XKB_KEY_XF86AudioLowerVolume, 0, [](xkb_keysym_t sym, uint32_t modmask){
 		Output::adjustVolume(-0.02);
-	});
+	}, true);
 
 	Input::registerKeyCallback(XKB_KEY_XF86AudioMute, 0, [](xkb_keysym_t sym, uint32_t modmask){
 		Output::muteVolume();

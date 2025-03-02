@@ -9,3 +9,6 @@
 
 const float bordercolor_inactive[] = COLOR(0x777777FF);
 const float bordercolor_active[] = COLOR(0xFF0000FF);
+
+#define REPEATKEY_DELAY 400
+#define REPEATKEY_FREQUENCY 50

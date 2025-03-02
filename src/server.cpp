@@ -87,8 +87,9 @@ namespace Server {
             if (wl_event_loop_dispatch(event_loop, 50) < 0) break;
             dispatchEvents();
             auto now = std::chrono::steady_clock::now();
-            //auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last);
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last);
             last = now;
+            Input::sendTimer(duration.count());
         }
 
         wl_display_destroy_clients(display);

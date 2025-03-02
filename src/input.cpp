@@ -4,6 +4,7 @@
 #include "server.hpp"
 #include "output.hpp"
 #include "launcher.hpp"
+#include "config.hpp"
 #include <map>
 
 namespace Input {
@@ -122,7 +123,7 @@ namespace Input {
 
     //KEYBOARD
 
-    std::map<uint64_t, ShortcutCallback> shortcut_callbacks; 
+    std::map<uint64_t, std::tuple<ShortcutCallback, bool>> shortcut_callbacks; 
 
     inline uint64_t getShortCutHash(xkb_keysym_t sym, uint32_t modmask) {
         return ((uint64_t)modmask << 32) | sym;
@@ -130,8 +131,8 @@ namespace Input {
 
     //TODO: fix das wenn mer shift mod mask macht aber nöd capitalized.
     //TODO: add repeat option: if key is held pressed it is triggered multiple times
-    void registerKeyCallback(xkb_keysym_t sym, uint32_t modmask, ShortcutCallback callback) {
-        shortcut_callbacks[getShortCutHash(sym, modmask)] = callback;
+    void registerKeyCallback(xkb_keysym_t sym, uint32_t modmask, ShortcutCallback callback, bool repeat) {
+        shortcut_callbacks[getShortCutHash(sym, modmask)] = {callback, repeat};
     }
 
     static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
@@ -150,11 +151,30 @@ namespace Input {
     }
 
     //return true if the keybind exists
-    static bool handle_keybinding(xkb_keysym_t sym, uint32_t modmask) {
+    inline bool handle_keybinding(xkb_keysym_t sym, uint32_t modmask, bool repeat) {
         auto it = shortcut_callbacks.find(getShortCutHash(sym, modmask));
         if(it == shortcut_callbacks.end()) return false;
-        it->second(sym, modmask);
+        if(repeat && !std::get<1>(it->second)) return true;
+        std::get<0>(it->second)(sym, modmask);
         return true;
+    }
+
+    //uint64 32bit modmask + 32bit ms
+    std::unordered_map<xkb_keysym_t, uint64_t> pressed_keys;
+
+    void sendTimer(uint ms) {
+        for(auto &entry : pressed_keys) {
+            uint32_t t = (uint32_t) entry.second;
+            uint32_t nt = t + ms;
+            if(nt >= REPEATKEY_DELAY 
+                    && t/REPEATKEY_FREQUENCY != nt/REPEATKEY_FREQUENCY) {
+                if(!handle_keybinding(entry.first, (uint32_t)(entry.second >> 32), true)) {
+                    if(Launcher::isRunning()) Launcher::keyPressEvent(entry.first);
+                }
+            }
+            entry.second += ms;
+            debug("key timer time={} key={}", (uint32_t) entry.second, entry.first);
+        }
     }
 
     static void keyboard_handle_key(struct wl_listener *listener, void *data) {
@@ -168,22 +188,34 @@ namespace Input {
         const xkb_keysym_t *syms;
         int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
 
-        bool handled = false;
+        std::string keys;
+        for(int i = 0; i < nsyms; i++) {
+            keys.push_back(syms[i]);
+            keys += "; ";
+        }
+        debug("KEY UPDATE state={} keys={}", (uint) event->state, keys);
+
         uint32_t modmask = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
         if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-            for (int i = 0; i < nsyms; i++) {
-                handled = handle_keybinding(syms[i], modmask);
+            for (int i = 0; i < nsyms; i++) if(handle_keybinding(syms[i], modmask, false)) {
+                pressed_keys[syms[i]] = ((uint64_t)modmask << 32);
+                return;
             }
+
+            if(Launcher::isRunning()) {
+                for (int i = 0; i < nsyms; i++) {
+                    Launcher::keyPressEvent(syms[i]);
+                    pressed_keys[syms[i]] = ((uint64_t)modmask << 32);
+                }
+                return;
+            }
+        } else for (int i = 0; i < nsyms; i++) {
+            //FIXME: wenn press mit shit und release ohni gaht das kaputt.
+            auto it = pressed_keys.find(syms[i]);
+            if(it != pressed_keys.end()) pressed_keys.erase(it);
         }
-
-        if(handled) return;
-
-        if(Launcher::isRunning()) {
-            for (int i = 0; i < nsyms; i++) Launcher::keyPressEvent(syms[i]);
-            return;
-        }
-
-        /* Otherwise, we pass it along to the client. */
+        
+        /* pass it along to the client. */
         assert(keyboard);
         assert(keyboard->wlr_keyboard);
         assert(seat);
