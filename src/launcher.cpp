@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
+#include <ranges>
 
 namespace fs = std::filesystem;
 
@@ -113,7 +115,7 @@ struct ApplicationEntry {
     const std::string name;
     const std::string generic_name;
     const std::string exec;
-    const std::string search_terms;
+    const std::unordered_set<std::string> search_terms;
     const bool terminal;
 };
 
@@ -151,10 +153,17 @@ void processEntry(const Fields& fields, std::list<ApplicationEntry> &entries) {
     std::string generic_name = "";
     if(it != fields.end()) generic_name = it->second;
 
-    std::string search_terms = name;
-    if(generic_name.size() > 0) search_terms += ";" + generic_name;
+    std::unordered_set<std::string> search_terms;
+    search_terms.insert(name);
+    if(generic_name.size() > 0) search_terms.insert(generic_name);
     it = fields.find("Keywords");
-    if(it != fields.end() && it->second.size() > 0) search_terms += ";" + it->second;
+    if(it != fields.end() && it->second.size() > 0) {
+        std::string keywords = it->second;
+        for (auto&& part : keywords | std::views::split(';')) {
+            if(part.begin() == part.end()) continue;
+            search_terms.emplace(part.begin(), part.end());
+        }
+    }
 
     entries.push_back({
         name,
@@ -202,13 +211,15 @@ namespace Launcher {
 
         auto entries = getApplicationEntries();
         for(ApplicationEntry &entry : entries) {
-            std::cout << std::format("\n[Desktop Entry]\nname={}\ngeneric_name={}\nexec={}\nsearch_terms={}\nterminal={}",
+            std::cout << std::format("\n[Desktop Entry]\nname={}\ngeneric_name={}\nexec={}\nterminal={}",
                 entry.name,
                 entry.generic_name,
                 entry.exec,
-                entry.search_terms,
                 entry.terminal
             ) << std::endl;
+            std::cout << "searchterms=[";
+            for(auto e : entry.search_terms) std::cout << e << "], [";
+            std::cout << "]" << std::endl;
         }
     }
 
