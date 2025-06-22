@@ -210,7 +210,7 @@ namespace Input {
                 return;
             }
         } else for (int i = 0; i < nsyms; i++) {
-            //FIXME: wenn press mit shit und release ohni gaht das kaputt.
+            //FIXME: wenn press mit shift und release ohni gaht das kaputt.
             auto it = pressed_keys.find(syms[i]);
             if(it != pressed_keys.end()) pressed_keys.erase(it);
         }

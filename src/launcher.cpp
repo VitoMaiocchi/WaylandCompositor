@@ -231,17 +231,17 @@ void draw(cairo_t* cr) {
     cairo_move_to(cr, 20, 60);
     cairo_show_text(cr, search_text.c_str());
 
-    uint s = current_node->entries.size();
     std::string results = "";
     if(tree_overflow > 0) results = "no results";
-    else if(s > 10) results = "RESULT SIZE: " + std::to_string(current_node->entries.size());
-    else if(s == 0) results = "no results";
     else {
         int line = 100;
+        uint c = 0;
         for(auto i : current_node->entries) {
+            c++;
             cairo_move_to(cr, 18, line);
             cairo_show_text(cr, entries[i].name.c_str());
             line += 30;
+            if(c > 10) break;
         }
     }
 
@@ -273,7 +273,7 @@ namespace Launcher {
                 current = root_node;
                 current->entries.insert(i);
                 for(int j = 0; j < term.size(); j++) {
-                    char c = term[j];
+                    char c = std::tolower(term[j]);
                     auto it = current->children.find(c);
                     if(it != current->children.end()) current = current->children[c];
                     else {
@@ -355,7 +355,7 @@ namespace Launcher {
                 if (sym < 0x20 || sym > 0xfff) break;
                 debug("Keypress Event text");
                 search_text += sym;
-                auto it = current_node->children.find(sym);
+                auto it = current_node->children.find(std::tolower(sym));
                 if(it != current_node->children.end()) current_node = it->second;
                 else tree_overflow++;
                 buffer->draw(draw, ext);
