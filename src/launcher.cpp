@@ -198,13 +198,8 @@ std::list<ApplicationEntry> getApplicationEntries() {
 //     return 1+min;
 // }
 
-std::string search_text;
-
-std::vector<ApplicationEntry> entries;
-std::unordered_map<std::string, std::set<int>*> search_term_entries;
-
 struct Node {
-    int entry = -1; //-1 = treenode; 0 >= leafnode
+    std::set<int> entries;
     std::unordered_map<char, Node*> children;
     Node* parent = nullptr;
 
@@ -213,6 +208,13 @@ struct Node {
             delete child;
     }
 };
+
+std::vector<ApplicationEntry> entries;
+
+std::string search_text;
+uint tree_overflow = 0;
+Node* root_node = nullptr;
+Node* current_node = nullptr;
 
 void draw(cairo_t* cr) {
 	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
@@ -228,6 +230,24 @@ void draw(cairo_t* cr) {
 	cairo_show_text (cr, text.c_str());
     cairo_move_to(cr, 20, 60);
     cairo_show_text(cr, search_text.c_str());
+
+    uint s = current_node->entries.size();
+    std::string results = "";
+    if(tree_overflow > 0) results = "no results";
+    else if(s > 10) results = "RESULT SIZE: " + std::to_string(current_node->entries.size());
+    else if(s == 0) results = "no results";
+    else {
+        int line = 100;
+        for(auto i : current_node->entries) {
+            cairo_move_to(cr, 18, line);
+            cairo_show_text(cr, entries[i].name.c_str());
+            line += 30;
+        }
+    }
+
+    cairo_move_to(cr, 18, 100);
+    cairo_show_text(cr, results.c_str());
+
 }
 
 }
@@ -243,16 +263,28 @@ namespace Launcher {
         auto list = getApplicationEntries();
         entries = std::vector<ApplicationEntry>(list.begin(), list.end());
 
+        root_node = new Node();
+        root_node->parent = nullptr;
+        Node* current;
+
         for(int i = 0; i < entries.size(); i++) {
-            for(auto e : entries[i].search_terms) {
-                auto it = search_term_entries.find(e);
-                std::set<int>* entry_indexes;
-                if(it != search_term_entries.end()) entry_indexes = it->second;
-                else {
-                    entry_indexes = new std::set<int>;
-                    search_term_entries[e] = entry_indexes;
+            for(auto term : entries[i].search_terms) {
+                
+                current = root_node;
+                current->entries.insert(i);
+                for(int j = 0; j < term.size(); j++) {
+                    char c = term[j];
+                    auto it = current->children.find(c);
+                    if(it != current->children.end()) current = current->children[c];
+                    else {
+                        Node* n = new Node();
+                        n->parent = current;
+                        current->children[c] = n;
+                        current = n;
+                    }
+                    current->entries.insert(i);
                 }
-                entry_indexes->insert(i);
+
             }
         }
 
@@ -269,11 +301,13 @@ namespace Launcher {
             std::cout << "]" << std::endl;
         }
 
-        for(auto e : search_term_entries) {
-            std::cout << "\n[" << e.first << "]" << std::endl;
-            for(auto i : *e.second) {
-                std::cout << "  - " << entries[i].name << std::endl;
-            }
+        std::cout << "[ROOTNODE]" << std::endl;
+        for(auto i : root_node->entries) std::cout << entries[i].name << "; ";
+        std::cout << std::endl;
+        for(auto c : root_node->children) {
+            std::cout << "child: " << c.first << std::endl;
+            for(auto i : c.second->entries) std::cout << entries[i].name << "; ";
+            std::cout << std::endl;
         }
     }
 
@@ -283,8 +317,11 @@ namespace Launcher {
 
     void run() {
         assert(!running);
+        assert(root_node);
         running = true;
-        search_text = "kys";
+        search_text = "";
+        current_node = root_node;
+        tree_overflow = 0;
         buffer = new Output::Buffer();
         ext = Layout::getActiveDisplayDimensions();
         ext = {
@@ -298,6 +335,7 @@ namespace Launcher {
     }
 
     void keyPressEvent(xkb_keysym_t sym) {
+        assert(current_node);
         debug("Keypress Event sym={}", (char)sym);
         switch(sym) {
             case XKB_KEY_Escape:
@@ -309,12 +347,17 @@ namespace Launcher {
                 debug("Keypress Event sym=backspace");
                 if(search_text.size() == 0) break;
                 search_text.erase(search_text.end()-1);
+                if(tree_overflow > 0) tree_overflow--;
+                else current_node = current_node->parent;
                 buffer->draw(draw, ext);
             break;
             default:
                 if (sym < 0x20 || sym > 0xfff) break;
                 debug("Keypress Event text");
                 search_text += sym;
+                auto it = current_node->children.find(sym);
+                if(it != current_node->children.end()) current_node = it->second;
+                else tree_overflow++;
                 buffer->draw(draw, ext);
             break;
         }
@@ -326,5 +369,6 @@ namespace Launcher {
 
     void cleanup() {
         //TODO: cleanup tree
+        if(root_node) delete root_node;
     }
 }
