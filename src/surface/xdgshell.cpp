@@ -66,6 +66,7 @@ struct xdg_shell_surface_listeners {
     wl_listener commit;
 
     wlr_xdg_toplevel* xdg_toplevel;
+    bool innitial_commit = true;
 };
 
 void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
@@ -94,6 +95,7 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
         wl_list_remove(&listeners->map.link);
         wl_list_remove(&listeners->unmap.link);
         wl_list_remove(&listeners->destroy.link);
+        wl_list_remove(&listeners->commit.link);
 
         delete listeners;
     };
@@ -102,10 +104,12 @@ void new_xdg_toplevel_notify(struct wl_listener* listener, void* data) {
         xdg_shell_surface_listeners* listeners = wl_container_of(listener, listeners, commit);
         wlr_xdg_toplevel* toplevel = listeners->xdg_toplevel;
 
+        if(!listeners->innitial_commit) return;
         if(!toplevel->base->initial_commit) return;
         assert(toplevel->base->initialized);
 
         listeners->surface->map_event(true);
+        listeners->innitial_commit= false;
 
         wlr_xdg_toplevel_decoration_v1* dec = (wlr_xdg_toplevel_decoration_v1*) toplevel->base->data;
         if(!dec) return; //TODO: add full support for fullscreen: okular presentation mode
