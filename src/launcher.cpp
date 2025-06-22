@@ -181,7 +181,38 @@ std::list<ApplicationEntry> getApplicationEntries() {
     return entries;
 }
 
+// //FIXME: this is probably horribly inefficient
+// uint getLevenshteinDistance(const std::string &a, const std::string &b) {
+//     if(a.size() == 0) return b.size();
+//     if(b.size() == 0) return a.size();
+
+//     const std::string at = a.substr(1);
+//     const std::string bt = b.substr(1);
+//     if(a[0] == b[0]) return getLevenshteinDistance(at, bt);
+    
+//     uint min = getLevenshteinDistance(at, bt);
+//     uint x = getLevenshteinDistance(a, bt);
+//     if(x < min) min = x;
+//     x = getLevenshteinDistance(bt,a);
+//     if(x < min) min = x;
+//     return 1+min;
+// }
+
 std::string search_text;
+
+std::vector<ApplicationEntry> entries;
+std::unordered_map<std::string, std::set<int>*> search_term_entries;
+
+struct Node {
+    int entry = -1; //-1 = treenode; 0 >= leafnode
+    std::unordered_map<char, Node*> children;
+    Node* parent = nullptr;
+
+    ~Node() {
+        for (auto& [_, child] : children)
+            delete child;
+    }
+};
 
 void draw(cairo_t* cr) {
 	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
@@ -209,7 +240,23 @@ namespace Launcher {
         //     for(auto f : fields) std::cout << "key=" << f.first << "; value=" << f.second << ";" << std::endl;
         // }
 
-        auto entries = getApplicationEntries();
+        auto list = getApplicationEntries();
+        entries = std::vector<ApplicationEntry>(list.begin(), list.end());
+
+        for(int i = 0; i < entries.size(); i++) {
+            for(auto e : entries[i].search_terms) {
+                auto it = search_term_entries.find(e);
+                std::set<int>* entry_indexes;
+                if(it != search_term_entries.end()) entry_indexes = it->second;
+                else {
+                    entry_indexes = new std::set<int>;
+                    search_term_entries[e] = entry_indexes;
+                }
+                entry_indexes->insert(i);
+            }
+        }
+
+        //DEBUG PRINT:
         for(ApplicationEntry &entry : entries) {
             std::cout << std::format("\n[Desktop Entry]\nname={}\ngeneric_name={}\nexec={}\nterminal={}",
                 entry.name,
@@ -220,6 +267,13 @@ namespace Launcher {
             std::cout << "searchterms=[";
             for(auto e : entry.search_terms) std::cout << e << "], [";
             std::cout << "]" << std::endl;
+        }
+
+        for(auto e : search_term_entries) {
+            std::cout << "\n[" << e.first << "]" << std::endl;
+            for(auto i : *e.second) {
+                std::cout << "  - " << entries[i].name << std::endl;
+            }
         }
     }
 
@@ -268,5 +322,9 @@ namespace Launcher {
 
     bool isRunning() {
         return running;
+    }
+
+    void cleanup() {
+        //TODO: cleanup tree
     }
 }
