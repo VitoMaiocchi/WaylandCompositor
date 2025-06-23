@@ -338,6 +338,18 @@ namespace Launcher {
         assert(current_node);
         debug("Keypress Event sym={}", (char)sym);
         switch(sym) {
+            case XKB_KEY_Return:
+                if(!running) break;
+                {
+                    assert(current_node);
+                    auto it = current_node->entries.begin();
+                    if(it == current_node->entries.end()) break;
+                    if(entries[*it].terminal) {
+                        std::string k = "konsole -e "+ entries[*it].exec;
+                        spawn(k.c_str());
+                    }
+                    else spawn(entries[*it].exec.c_str());
+                }
             case XKB_KEY_Escape:
                 delete buffer;
                 buffer = nullptr;
