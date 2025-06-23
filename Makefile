@@ -34,12 +34,17 @@ include/wlr-layer-shell-unstable-v1-protocol.h:
 	$(WAYLAND_SCANNER) server-header \
 		protocols/wlr-layer-shell-unstable-v1.xml $@
 
+include/wlr-screencopy-unstable-v1-protocol.h:
+	@echo -e "$(BLUE)Generating LayerShell protocol...$(END)"
+	$(WAYLAND_SCANNER) server-header \
+		protocols/wlr-screencopy-unstable-v1.xml $@
+
 
 SRCS := $(shell find src -name '*.cpp')
 OBJS = $(patsubst src/%.cpp, build/%.o, $(SRCS))
 HEADERS = $(wildcard include/*.hpp)
 
-build/%.o: src/%.cpp $(HEADERS) include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h
+build/%.o: src/%.cpp $(HEADERS) include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h include/wlr-screencopy-unstable-v1-protocol.h
 	@mkdir -p build
 	@mkdir -p $(dir $@)
 	@echo -e "$(YELLOW)Compiling $<...$(END)"
@@ -53,7 +58,7 @@ wpctl: src/wpctl.c
 	$(CC) -o wpctl src/wpctl.c $(shell pkg-config --cflags --libs libspa-0.2 libpipewire-0.3 wireplumber-0.5)
 
 clean:
-	rm -r VitoWM include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h build gdb_stacktrace.txt
+	rm -r VitoWM include/xdg-shell-protocol.h include/wlr-layer-shell-unstable-v1-protocol.h include/wlr-screencopy-unstable-v1-protocol.h build gdb_stacktrace.txt
 
 .DEFAULT_GOAL=VitoWM
 .PHONY: clean

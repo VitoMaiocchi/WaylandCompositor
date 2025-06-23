@@ -11,6 +11,9 @@
 #include "layout.hpp"
 #include "server.hpp"
 
+//TODO: implement screen recording
+#include "wlr-screencopy-unstable-v1-protocol.h"
+
 #include <functional>
 #include <algorithm>
 #include <thread>
