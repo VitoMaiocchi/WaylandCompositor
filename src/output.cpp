@@ -12,7 +12,7 @@
 #include "server.hpp"
 
 //TODO: implement screen recording
-#include "wlr-screencopy-unstable-v1-protocol.h"
+//#include "wlr-screencopy-unstable-v1-protocol.h"
 
 #include <functional>
 #include <algorithm>
@@ -33,6 +33,7 @@ namespace Output {
 	wlr_scene_output_layout* scene_layout;
 	wlr_output_layout* output_layout;
     wlr_scene* scene;
+	wlr_xdg_output_manager_v1* xdg_output_mgr;
 
 	class Monitor { //represents a Physical Monitor / output
         public:
@@ -142,6 +143,9 @@ namespace Output {
 
         scene = wlr_scene_create();
         scene_layout = wlr_scene_attach_output_layout(scene, output_layout);
+
+		wlr_screencopy_manager_v1_create(Server::display);
+		xdg_output_mgr = wlr_xdg_output_manager_v1_create(Server::display, output_layout);
 
 		setupPipeWire();
     }
