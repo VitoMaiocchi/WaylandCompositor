@@ -216,19 +216,19 @@ uint tree_overflow = 0;
 Node* root_node = nullptr;
 Node* current_node = nullptr;
 
-void draw(cairo_t* cr) {
+void draw(cairo_t* cr, double scaling) { //TODO: scaling
 	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
 	cairo_paint(cr);
 
 	cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-	cairo_set_font_size (cr, 20.0);
+	cairo_set_font_size (cr, 20.0*scaling);
 
     std::string text = "LAUNCHER";
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
-	cairo_move_to (cr, 20.0, 25.0);
+	cairo_move_to (cr, 20.0*scaling, 25.0*scaling);
 	cairo_show_text (cr, text.c_str());
-    cairo_move_to(cr, 20, 60);
+    cairo_move_to(cr, 20*scaling, 60*scaling);
     cairo_show_text(cr, search_text.c_str());
 
     std::string results = "";
@@ -238,14 +238,14 @@ void draw(cairo_t* cr) {
         uint c = 0;
         for(auto i : current_node->entries) {
             c++;
-            cairo_move_to(cr, 18, line);
+            cairo_move_to(cr, 18*scaling, line*scaling);
             cairo_show_text(cr, entries[i].name.c_str());
             line += 30;
             if(c > 10) break;
         }
     }
 
-    cairo_move_to(cr, 18, 100);
+    cairo_move_to(cr, 18*scaling, 100*scaling);
     cairo_show_text(cr, results.c_str());
 
 }
@@ -344,6 +344,7 @@ namespace Launcher {
                     assert(current_node);
                     auto it = current_node->entries.begin();
                     if(it == current_node->entries.end()) break;
+                    if(tree_overflow > 0) break;
                     if(entries[*it].terminal) {
                         std::string k = "konsole -e "+ entries[*it].exec;
                         spawn(k.c_str());

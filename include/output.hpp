@@ -22,7 +22,7 @@ namespace Output {
         public:
             Buffer();
             ~Buffer();
-            void draw(std::function<void(cairo_t*)> draw, Extends ext);
+            void draw(std::function<void(cairo_t*, double scale)> draw, Extends ext);
         private:
             wlr_scene_buffer* scene_buffer;
     };

@@ -26,6 +26,9 @@
 //volume updates don't need to be extremly responsive
 #define AUDIO_MAINLOOP_REFRESHTIME 10
 
+//ONLY TEMP
+#define SCALING 2
+
 namespace Output {
 
 	//MONITOR BEGIN
@@ -64,6 +67,7 @@ namespace Output {
 		struct wlr_output_mode *mode = wlr_output_preferred_mode(output);
 		wlr_output_state_init(&state);
 		wlr_output_state_set_enabled(&state, true);
+		wlr_output_state_set_scale(&state, SCALING);
 		if (mode) wlr_output_state_set_mode(&state, mode);
 		wlr_output_commit_state(output, &state);
 		wlr_output_state_finish(&state);
@@ -73,8 +77,8 @@ namespace Output {
 		struct wlr_scene_output *scene_output = wlr_scene_output_create(scene, output);
 		wlr_scene_output_layout_add_output(scene_layout, l_output, scene_output);
 
-		extends.width = output->width;
-		extends.height = output->height;
+		extends.width = output->width/SCALING;
+		extends.height = output->height/SCALING;
 		extends.x = scene_output->x;
 		extends.y = scene_output->y;
 
@@ -227,14 +231,15 @@ namespace Output {
 		wlr_scene_node_destroy(&scene_buffer->node);
 	}
 
-	void Buffer::draw(std::function<void(cairo_t*)> draw, Extends ext) {
+	void Buffer::draw(std::function<void(cairo_t*, double scale)> draw, Extends ext) {
 		wlr_scene_node_set_position(&scene_buffer->node, ext.x, ext.y);
+		wlr_scene_buffer_set_dest_size(scene_buffer, ext.width, ext.height);
 
-		cairo_buffer* buffer = create_cairo_buffer(ext.width, ext.height);
+		cairo_buffer* buffer = create_cairo_buffer(ext.width*SCALING, ext.height*SCALING);
 		assert(buffer);
 		cairo_t *cr = cairo_create(buffer->surface);
 
-		draw(cr);
+		draw(cr, SCALING);
 
 		cairo_destroy(cr);
 		wlr_scene_buffer_set_buffer(scene_buffer, &buffer->base);

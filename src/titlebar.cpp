@@ -95,24 +95,24 @@ void Titlebar::updateDesktop(uint desktop) {
     drawBuffer();
 }
 
-void draw(cairo_t* cr, uint desktop) {
+void draw(cairo_t* cr, double scaling, uint desktop) {
 	cairo_set_source_rgb(cr, 0.2, 0.8, 0.6);
 	cairo_paint(cr);
 
 	cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-	cairo_set_font_size (cr, 20.0);
+	cairo_set_font_size (cr, 20.0*scaling);
 
     std::string text = current_time +"   Desktop: "+ std::to_string(desktop+1)+
         "   "+battery_status + "   "+volume_text+" "+debug_text;
 
 	cairo_set_source_rgb(cr, 0, 0, 0);
-	cairo_move_to (cr, 20.0, 25.0);
+	cairo_move_to (cr, 20.0*scaling, 25.0*scaling);
 	cairo_show_text (cr, text.c_str());
 }
 
-std::function<void(cairo_t*)> draw_func(uint desktop) {
-    return [desktop](cairo_t* cr) {
-        draw(cr, desktop);
+std::function<void(cairo_t*, double)> draw_func(uint desktop) {
+    return [desktop](cairo_t* cr, double scaling) {
+        draw(cr, scaling, desktop);
     };
 }
 
