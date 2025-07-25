@@ -199,6 +199,7 @@ class Desktop {
     DoubleCollumnTilingLayout tilingLayout;
     Extends extends;
     Surface::Toplevel* focused_toplevel = nullptr;
+    Surface::Toplevel* maximized_toplevel = nullptr;
     bool focused = false;
 
     public:
@@ -218,6 +219,12 @@ class Desktop {
     }
 
     void addSurface(Surface::Toplevel* surface) {
+        if(maximized_toplevel) {
+            for(auto it = tilingLayout.begin(); it != tilingLayout.end(); it++) {
+                if(*it!=maximized_toplevel) (*it)->setVisibility(true);
+            }
+            maximized_toplevel = nullptr;
+        }
         tilingLayout.addSurface(surface);
         tilingLayout.updateLayout(extends);
         setFocusedSurface(surface);
@@ -229,6 +236,26 @@ class Desktop {
         if(focused_toplevel != surface) return;
         if(new_focus) setFocusedSurface(new_focus);
         else focused_toplevel = nullptr;
+    }
+
+    void toggleMaximize() {
+        if(!maximized_toplevel) {
+            //MAXIMIZE
+            if(!focused_toplevel) return;
+            maximized_toplevel = focused_toplevel;
+            for(auto it = tilingLayout.begin(); it != tilingLayout.end(); it++) {
+                if(*it!=maximized_toplevel) (*it)->setVisibility(false);
+            }
+            maximized_toplevel->setExtends(extends);
+
+        } else {
+            //UNMAXIMIZE
+            for(auto it = tilingLayout.begin(); it != tilingLayout.end(); it++) {
+                if(*it!=maximized_toplevel) (*it)->setVisibility(true);
+            }
+            tilingLayout.updateLayout(extends);
+            maximized_toplevel = nullptr;
+        }
     }
 
     void setFocus(bool focus) {
@@ -311,6 +338,10 @@ class Display {
         desktops[current_desktop].removeSurface(surface);
     }
 
+    void toggleMaximize() {
+        desktops[current_desktop].toggleMaximize();
+    }
+
     void setDesktop(uint desktop) {
         titlebar.updateDesktop(desktop);
         desktops[current_desktop].setVisibility(false);
@@ -372,6 +403,10 @@ void killClient() {
     if(!display) return;
     const auto s = display->getFocusedSurface();
     if(s) s->kill();
+}
+
+void toggleMaximize() {
+    getFocusedDisplay()->toggleMaximize();
 }
 
 Extends getActiveDisplayDimensions() {

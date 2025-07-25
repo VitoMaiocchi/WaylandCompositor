@@ -11,9 +11,6 @@
 #include "layout.hpp"
 #include "server.hpp"
 
-//TODO: implement screen recording
-//#include "wlr-screencopy-unstable-v1-protocol.h"
-
 #include <functional>
 #include <algorithm>
 #include <thread>
@@ -26,7 +23,7 @@
 //volume updates don't need to be extremly responsive
 #define AUDIO_MAINLOOP_REFRESHTIME 10
 
-//ONLY TEMP
+//TODO: fix this temp hardcoded scaling
 #define SCALING 2
 
 namespace Output {

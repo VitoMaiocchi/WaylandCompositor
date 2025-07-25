@@ -181,23 +181,6 @@ std::list<ApplicationEntry> getApplicationEntries() {
     return entries;
 }
 
-// //FIXME: this is probably horribly inefficient
-// uint getLevenshteinDistance(const std::string &a, const std::string &b) {
-//     if(a.size() == 0) return b.size();
-//     if(b.size() == 0) return a.size();
-
-//     const std::string at = a.substr(1);
-//     const std::string bt = b.substr(1);
-//     if(a[0] == b[0]) return getLevenshteinDistance(at, bt);
-    
-//     uint min = getLevenshteinDistance(at, bt);
-//     uint x = getLevenshteinDistance(a, bt);
-//     if(x < min) min = x;
-//     x = getLevenshteinDistance(bt,a);
-//     if(x < min) min = x;
-//     return 1+min;
-// }
-
 struct Node {
     std::set<int> entries;
     std::unordered_map<char, Node*> children;

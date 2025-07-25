@@ -13,6 +13,7 @@ namespace Layout {
     void handleCursorMovement(const double x, const double y);
     void setDesktop(uint desktop);
     void killClient();
+    void toggleMaximize();
 
     Extends getActiveDisplayDimensions();
 
