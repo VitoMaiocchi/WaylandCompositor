@@ -250,6 +250,7 @@ class Desktop {
 
     //FIXME: this is all horrible and duplicated code#
     void toggleMaximize() {
+        if(fullscreen_toplevel) return;
         if(!maximized_toplevel) {
             //MAXIMIZE
             if(!focused_toplevel) return;
@@ -280,6 +281,15 @@ class Desktop {
             fullscreen_toplevel->setFullscreen(true, full_ext);
         } else {
             //UNFULLSCREEN
+            if(maximized_toplevel) {
+                if(maximized_toplevel == fullscreen_toplevel) {
+                    maximized_toplevel->setFullscreen(false, extends);
+                    fullscreen_toplevel = nullptr;
+                    return;
+                }
+                //this should be unreachable
+                maximized_toplevel = nullptr;
+            }
             for(auto it = tilingLayout.begin(); it != tilingLayout.end(); it++) {
                 if(*it!=fullscreen_toplevel) (*it)->setVisibility(true);
             }
