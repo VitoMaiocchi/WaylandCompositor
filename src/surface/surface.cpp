@@ -63,6 +63,7 @@ Toplevel::Toplevel() {
 	extends = {0,0,0,0};
 	visible = false;
 	focused = false;
+	fullscreen = false;
 	availableArea = extends;
 	root_node = wlr_scene_tree_create(client_layer);
 }
@@ -130,9 +131,11 @@ void Toplevel::setVisibility(bool visible) {
 	wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
 	debug("Toplevel set suface size: width={}, height={}", extends.width, extends.height);
 	assert(extends.width > 0 && extends.height > 0);
-	//FIXME: surface size edge case
-	setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
-	wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
+	//FIXME: surface size edge case (minus wert)
+	if(!fullscreen) {
+		setSurfaceSize(extends.width-2*BORDERWIDTH, extends.height-2*BORDERWIDTH);
+		wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
+	}
 
 	wlr_scene_node_set_enabled(&root_node->node, true);
 
@@ -157,8 +160,22 @@ void Toplevel::setVisibility(bool visible) {
 
 void Toplevel::setFullscreen(bool fullscreen, Extends extends) {
 	this->setFullscreen(fullscreen);
-	this->setExtends(extends); //TODO: hide decoration
 	wlr_scene_node_raise_to_top(&client_layer->node); //FIXME: this is ass (better hide titlebar)
+
+	this->fullscreen = fullscreen;
+
+	if(!fullscreen) {
+		for(uint i=0; i<4; i++) wlr_scene_node_set_enabled(&border[i]->node, true);
+		wlr_scene_node_set_position(&surface_node->node, BORDERWIDTH, BORDERWIDTH);
+		this->setExtends(extends);
+		return;
+	}
+
+	for(uint i=0; i<4; i++) wlr_scene_node_set_enabled(&border[i]->node, false);
+	wlr_scene_node_set_position(&root_node->node, extends.x, extends.y);
+	wlr_scene_node_set_position(&surface_node->node, 0, 0);
+	setSurfaceSize(extends.width, extends.height);
+	this->extends = extends;
 }
 
 std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) const {
