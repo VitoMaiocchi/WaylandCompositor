@@ -14,6 +14,7 @@ namespace Layout {
     void setDesktop(uint desktop);
     void killClient();
     void toggleMaximize();
+    void toggleFullscreen();
 
     Extends getActiveDisplayDimensions();
 

@@ -243,6 +243,10 @@ namespace Output {
 		wlr_buffer_drop(&buffer->base);
 	}
 
+	void Buffer::setVisibility(bool visible) {
+		wlr_scene_node_set_enabled(&scene_buffer->node, visible);
+	}
+
 
 	//PIPEWIRE / WIREPLUMBER
 

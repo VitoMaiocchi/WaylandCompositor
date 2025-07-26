@@ -155,6 +155,12 @@ void Toplevel::setVisibility(bool visible) {
 	}
 }
 
+void Toplevel::setFullscreen(bool fullscreen, Extends extends) {
+	this->setFullscreen(fullscreen);
+	this->setExtends(extends); //TODO: hide decoration
+	wlr_scene_node_raise_to_top(&client_layer->node); //FIXME: this is ass (better hide titlebar)
+}
+
 std::pair<int, int> Toplevel::surfaceCoordinateTransform(int x, int y) const {
 	return {x - (extends.x + BORDERWIDTH), y - (extends.y + BORDERWIDTH)};
 }

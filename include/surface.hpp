@@ -46,11 +46,13 @@ namespace Surface {
         Extends& getAvailableArea();
 	};
 
+    //FIXME: this is horrible (whole class is a clusterfuck refactor at some point)
     class Toplevel : public Parent {
         public:
         void setExtends(Extends extends);
         void setFocus(bool focus);
         void setVisibility(bool visible);
+        void setFullscreen(bool fullscreen, Extends extends);
 
         void setAvailableArea(Extends ext);
         virtual std::pair<int, int> surfaceCoordinateTransform(int x, int y) const;
@@ -68,6 +70,7 @@ namespace Surface {
         void mapNotify(bool mapped);
         void minimizeRequestNotify(bool minimize); //TODO minimize support
         void fullscreenRequestNotify(bool fullscreen); //TODO fullscreen support
+        virtual void setFullscreen(bool fullscreen) = 0;
 
         wlr_scene_tree* surface_node; //Surface node: holds the surface itself without decorations
         wlr_scene_rect* border[4]; // Borders of the window in the following order: top, bottom, left, right

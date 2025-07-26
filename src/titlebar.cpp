@@ -158,3 +158,7 @@ std::string getBatteryStatus() {
 
     return status;
 }
+
+void Titlebar::setVisibility(bool visible) {
+    buffer.setVisibility(visible);
+}

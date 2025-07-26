@@ -45,6 +45,10 @@ class XwaylandToplevel : public Surface::Toplevel {
     void kill() {
         wlr_xwayland_surface_close(xwayland_surface);
     }
+
+    void setFullscreen(bool fullscreen) {
+        wlr_xwayland_surface_set_fullscreen(xwayland_surface, fullscreen);
+    }
 };
 
 //TODO: add option for rearrange

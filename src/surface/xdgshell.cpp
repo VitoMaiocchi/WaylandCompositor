@@ -55,6 +55,10 @@ class XdgToplevel : public Surface::Toplevel {
         p.second += box.y;
         return p;
     }
+
+    void setFullscreen(bool fullscreen) {
+        wlr_xdg_toplevel_set_fullscreen(xdg_toplevel, fullscreen);
+    }
 };
 
 struct xdg_shell_surface_listeners {

@@ -23,6 +23,7 @@ namespace Output {
             Buffer();
             ~Buffer();
             void draw(std::function<void(cairo_t*, double scale)> draw, Extends ext);
+            void setVisibility(bool visible);
         private:
             wlr_scene_buffer* scene_buffer;
     };

@@ -8,6 +8,7 @@ class Titlebar {
     ~Titlebar();
     void updateExtends(Extends ext);
     void updateDesktop(uint desktop);
+    void setVisibility(bool visible);
 
     static void setup();
     static int update_titlebars(void* data);

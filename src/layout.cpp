@@ -18,7 +18,12 @@ class TilingLayout {
     virtual void addSurface(Surface::Toplevel* surface) = 0;
     virtual Surface::Toplevel* removeSurface(Surface::Toplevel* surface) = 0;
     virtual Surface::Toplevel* getSurfaceAtLocation(const double x, const double y, Surface::Toplevel* include_children) = 0;
-    virtual void updateLayout(Extends &extends) = 0;
+    virtual void updateLayout(Extends &extends, std::function<void(Surface::Toplevel*, Extends)> set_extends) = 0;
+    void updateLayout(Extends &extends) {
+        updateLayout(extends, [](Surface::Toplevel* toplevel, Extends ext){
+            toplevel->setExtends(ext);
+        });
+    }
     virtual Iterator begin() = 0;
     virtual Iterator end() = 0;
 
@@ -29,6 +34,7 @@ class TilingLayout {
     }
 };
 
+/*
 class LinearTilingLayout : public TilingLayout<std::list<Surface::Toplevel*>::iterator> {
     protected:
     std::list<Surface::Toplevel*> surfaces;
@@ -97,6 +103,7 @@ class HorizontalTilingLayout : public LinearTilingLayout {
         }
     };
 };
+*/
 
 class DoubleCollumnTilingLayout : public TilingLayout<std::vector<Surface::Toplevel*>::iterator> {
     std::vector<Surface::Toplevel*> surfaces;
@@ -153,7 +160,7 @@ class DoubleCollumnTilingLayout : public TilingLayout<std::vector<Surface::Tople
         return surfaces.end();
     }
 
-    void updateCollumn(Extends extends, uint start, uint end) {
+    void updateCollumn(Extends extends, uint start, uint end, std::function<void(Surface::Toplevel*, Extends)> set_extends) {
         const uint n = end - start;
         debug("Update layout: n={}; Extends={}", n, extends);
         if(n == 0) return;
@@ -162,19 +169,19 @@ class DoubleCollumnTilingLayout : public TilingLayout<std::vector<Surface::Tople
         Extends ext = extends;
         ext.height = extends.height - (n-1)*h;
         debug("Update layout surface: Extends={}", ext);
-        surfaces[i]->setExtends(ext);
+        set_extends(surfaces[i], ext);
         ext.y += ext.height;
         ext.height = h;
         i++;
         while(i < end) {
             debug("Update layout surface: Extends={}", ext);
-            surfaces[i]->setExtends(ext);
+            set_extends(surfaces[i], ext);
             ext.y += h;
             i++;
         }
     }
 
-    void updateLayout(Extends &extends) {
+    void updateLayout(Extends &extends, std::function<void(Surface::Toplevel*, Extends)> set_extends) {
         if(size == 0) return;
         for(auto s : surfaces) s->setAvailableArea(extends); //TODO: suboptimal das musi zu desktop schiebe
         int m = extends.width / 2;
@@ -185,14 +192,16 @@ class DoubleCollumnTilingLayout : public TilingLayout<std::vector<Surface::Tople
             extends.y,
             m,
             extends.height
-        }, 0, middle_index);
+        }, 0, middle_index, set_extends);
         updateCollumn({
             extends.x + m,
             extends.y,
             extends.width - m,
             extends.height
-        }, middle_index, size);
+        }, middle_index, size, set_extends);
     };
+
+    using TilingLayout::updateLayout;
 };
 
 class Desktop {
@@ -200,6 +209,7 @@ class Desktop {
     Extends extends;
     Surface::Toplevel* focused_toplevel = nullptr;
     Surface::Toplevel* maximized_toplevel = nullptr;
+    Surface::Toplevel* fullscreen_toplevel = nullptr;
     bool focused = false;
 
     public:
@@ -238,6 +248,7 @@ class Desktop {
         else focused_toplevel = nullptr;
     }
 
+    //FIXME: this is all horrible and duplicated code#
     void toggleMaximize() {
         if(!maximized_toplevel) {
             //MAXIMIZE
@@ -255,6 +266,29 @@ class Desktop {
             }
             tilingLayout.updateLayout(extends);
             maximized_toplevel = nullptr;
+        }
+    }
+
+    void toggleFullscreen(Extends full_ext) {
+        if(!fullscreen_toplevel) {
+            //FULLSCREEN
+            if(!focused_toplevel) return;
+            fullscreen_toplevel = focused_toplevel;
+            for(auto it = tilingLayout.begin(); it != tilingLayout.end(); it++) {
+                if(*it!=fullscreen_toplevel) (*it)->setVisibility(false);
+            }
+            fullscreen_toplevel->setFullscreen(true, full_ext);
+        } else {
+            //UNFULLSCREEN
+            for(auto it = tilingLayout.begin(); it != tilingLayout.end(); it++) {
+                if(*it!=fullscreen_toplevel) (*it)->setVisibility(true);
+            }
+            const Surface::Toplevel* f = fullscreen_toplevel;
+            tilingLayout.updateLayout(extends, [f](Surface::Toplevel* toplevel, Extends ext){
+            if(toplevel!=f)toplevel->setExtends(ext);
+            else toplevel->setFullscreen(false, ext);
+            });
+            fullscreen_toplevel = nullptr;
         }
     }
 
@@ -342,6 +376,10 @@ class Display {
         desktops[current_desktop].toggleMaximize();
     }
 
+    void toggleFullscreen() {
+        desktops[current_desktop].toggleFullscreen(extends);
+    }
+
     void setDesktop(uint desktop) {
         titlebar.updateDesktop(desktop);
         desktops[current_desktop].setVisibility(false);
@@ -407,6 +445,10 @@ void killClient() {
 
 void toggleMaximize() {
     getFocusedDisplay()->toggleMaximize();
+}
+
+void toggleFullscreen() {
+    getFocusedDisplay()->toggleFullscreen();
 }
 
 Extends getActiveDisplayDimensions() {
